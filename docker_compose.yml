@@ -1,0 +1,15 @@
+#In the real world this file would be in a .gitignore to keep the password private
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123454321
+      POSTGRES_DB: workout_tracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - mydata:/var/lib/postgresql/data
+
+volumes:
+  mydata:
