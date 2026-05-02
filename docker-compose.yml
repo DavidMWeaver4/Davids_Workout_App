@@ -4,7 +4,7 @@ services:
     image: postgres:15
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 123454321
+      POSTGRES_PASSWORD: 12345
       POSTGRES_DB: workout_tracker
     ports:
       - "5432:5432"
