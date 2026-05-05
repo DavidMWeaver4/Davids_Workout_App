@@ -165,13 +165,25 @@ func (q *Queries) GetTotalDuration(ctx context.Context, arg GetTotalDurationPara
 	return column_1, err
 }
 
-const getTotalDurationForAllExercise = `-- name: GetTotalDurationForAllExercise :one
+const getTotalDurationForAllSets = `-- name: GetTotalDurationForAllSets :one
 SELECT SUM(duration_seconds + rest_time_seconds) FROM weights_and_sets
 WHERE workout_exercises_id = $1
 `
 
-func (q *Queries) GetTotalDurationForAllExercise(ctx context.Context, workoutExercisesID uuid.UUID) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getTotalDurationForAllExercise, workoutExercisesID)
+func (q *Queries) GetTotalDurationForAllSets(ctx context.Context, workoutExercisesID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getTotalDurationForAllSets, workoutExercisesID)
+	var sum int64
+	err := row.Scan(&sum)
+	return sum, err
+}
+
+const getTotalVolumeFromAllSets = `-- name: GetTotalVolumeFromAllSets :one
+SELECT SUM(reps_actual * weight) FROM weights_and_sets
+WHERE workout_exercises_id = $1
+`
+
+func (q *Queries) GetTotalVolumeFromAllSets(ctx context.Context, workoutExercisesID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getTotalVolumeFromAllSets, workoutExercisesID)
 	var sum int64
 	err := row.Scan(&sum)
 	return sum, err
