@@ -20,6 +20,11 @@ SELECT * FROM workout_sessions
 WHERE user_id = $1
 ORDER BY workout_date DESC;
 
+-- name: GetLastWorkoutSession :one
+SELECT * FROM workout_sessions
+WHERE user_id = $1
+ORDER BY workout_date DESC;
+
 -- name: GetWorkoutSessionsCount :one
 SELECT COUNT(*) FROM workout_sessions
 WHERE user_id = $1;

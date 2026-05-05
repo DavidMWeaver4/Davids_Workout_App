@@ -112,6 +112,27 @@ func (q *Queries) GetAllWorkoutSessionsSorted(ctx context.Context, userID uuid.U
 	return items, nil
 }
 
+const getLastWorkoutSession = `-- name: GetLastWorkoutSession :one
+SELECT id, user_id, workout_date, description, notes, created_at, updated_at FROM workout_sessions
+WHERE user_id = $1
+ORDER BY workout_date DESC
+`
+
+func (q *Queries) GetLastWorkoutSession(ctx context.Context, userID uuid.UUID) (WorkoutSession, error) {
+	row := q.db.QueryRowContext(ctx, getLastWorkoutSession, userID)
+	var i WorkoutSession
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.WorkoutDate,
+		&i.Description,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getWorkoutSessionByID = `-- name: GetWorkoutSessionByID :one
 SELECT id, user_id, workout_date, description, notes, created_at, updated_at FROM workout_sessions
 WHERE id = $1
