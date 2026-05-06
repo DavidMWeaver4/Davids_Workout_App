@@ -7,6 +7,8 @@ import(
 	"os"
 
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
+	"github.com/DavidMWeaver4/Davids_Workout_App/internal/handlers"
+	"github.com/DavidMWeaver4/Davids_Workout_App/internal/middleware"
 	"github.com/joho/godotenv"
 
 	_ "github.com/lib/pq"
@@ -38,6 +40,7 @@ func main(){
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/app/", apiCfg.middelwareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
+	//mux.HandleFunc("POST /api/v1/auth/register", apiCFG.handlerRegister)
 
 	myServer := http.Server{
 		Addr: ":" + port,
