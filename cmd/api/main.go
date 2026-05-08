@@ -32,15 +32,15 @@ func main() {
 
 	const port = "8080"
 	const filepathRoot = "."
-	/*apiCfg := apiConfig{
+	apiCfg := apiConfig{
 	db:        data,
 	platform:  envPlatform,
 	jwtSecret: secretKey,
-	}*/
+	}
 	mux := http.NewServeMux()
-	//mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
-	//mux.HandleFunc("POST /api/v1/auth/register", apiCFG.handlerRegister)
-	//
+	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
+	mux.HandleFunc("POST /api/v1/register", apiCfg.handlerRegister)
+	mux.HandleFunc("POST /api/v1/login", apiCfg.handlerLogin)
 
 	myServer := http.Server{
 		Addr:    ":" + port,
