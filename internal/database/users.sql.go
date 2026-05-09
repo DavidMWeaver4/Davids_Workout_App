@@ -62,13 +62,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
-const deleteUserByEmail = `-- name: DeleteUserByEmail :exec
+const deleteUserByID = `-- name: DeleteUserByID :exec
 DELETE FROM users
-WHERE email = $1
+WHERE id = $1
 `
 
-func (q *Queries) DeleteUserByEmail(ctx context.Context, email string) error {
-	_, err := q.db.ExecContext(ctx, deleteUserByEmail, email)
+func (q *Queries) DeleteUserByID(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteUserByID, id)
 	return err
 }
 
@@ -133,4 +133,36 @@ func (q *Queries) GetUsersEmails(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateUserEmail = `-- name: UpdateUserEmail :exec
+UPDATE users
+SET email = $1, updated_at = NOW()
+WHERE id = $2
+`
+
+type UpdateUserEmailParams struct {
+	Email string
+	ID    uuid.UUID
+}
+
+func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserEmail, arg.Email, arg.ID)
+	return err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :exec
+UPDATE users
+SET password_hash = $1, updated_at = NOW()
+WHERE id = $2
+`
+
+type UpdateUserPasswordParams struct {
+	PasswordHash string
+	ID           uuid.UUID
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserPassword, arg.PasswordHash, arg.ID)
+	return err
 }

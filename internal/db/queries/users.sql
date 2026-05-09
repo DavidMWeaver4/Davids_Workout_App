@@ -23,6 +23,16 @@ SELECT email From users;
 -- name: CountUsers :one
 SELECT COUNT(*) FROM users;
 
--- name: DeleteUserByEmail :exec
+-- name: DeleteUserByID :exec
 DELETE FROM users
-WHERE email = $1;
+WHERE id = $1;
+
+-- name: UpdateUserEmail :exec
+UPDATE users
+SET email = $1, updated_at = NOW()
+WHERE id = $2;
+
+-- name: UpdateUserPassword :exec
+UPDATE users
+SET password_hash = $1, updated_at = NOW()
+WHERE id = $2;
