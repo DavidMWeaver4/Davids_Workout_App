@@ -2,9 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/auth"
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
@@ -88,7 +86,10 @@ func (cfg *apiConfig) handlerChangeEmail(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusBadRequest, "Bad Request", err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, map[string]string{"message": "email updated"})
+	type msgResponse struct {
+		Message string `json:"message"`
+	}
+	respondWithJSON(w, http.StatusOK, msgResponse{"email updated"})
 }
 func (cfg *apiConfig) handlerChangePassword(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
@@ -118,7 +119,10 @@ func (cfg *apiConfig) handlerChangePassword(w http.ResponseWriter, r *http.Reque
 		respondWithError(w, http.StatusInternalServerError, "Failed to store to database", err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, map[string]string{"message": "password updated"})
+	type msgResponse struct {
+		Message string `json:"message"`
+	}
+	respondWithJSON(w, http.StatusOK, msgResponse{"password updated"})
 }
 
 func (cfg *apiConfig) handlerDeleteMe(w http.ResponseWriter, r *http.Request) {
@@ -155,42 +159,8 @@ func (cfg *apiConfig) handlerDeleteMe(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Failed to delete user from database", err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, map[string]string{"message": "user deleted"})
-}
-
-func sanitizeEmail(email string) string {
-	emailParts, err := checkEmail(email)
-	if err != nil {
-		return "invalid email"
+	type msgResponse struct {
+		Message string `json:"message"`
 	}
-	username := emailParts[0]
-	domain := emailParts[1]
-	if len(username) > 2 {
-		return username[:2] + "****@" + domain
-	}
-	return username + "****@" + domain
-}
-
-func checkEmail(email string) ([]string, error) {
-	email = strings.TrimSpace(email)
-	email = strings.ToLower(email)
-	parts := strings.Split(email, "@")
-	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid email format: missing @ symbol")
-	}
-	return parts, nil
-}
-
-func (cfg *apiConfig) getUserIDFromToken(w http.ResponseWriter, r *http.Request) (uuid.UUID, error) {
-	token, err := auth.GetBearerToken(r.Header)
-	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Missing token", err)
-		return uuid.Nil, err
-	}
-	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
-	if err != nil {
-		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
-		return uuid.Nil, err
-	}
-	return userID, nil
+	respondWithJSON(w, http.StatusOK, msgResponse{"user deleted"})
 }

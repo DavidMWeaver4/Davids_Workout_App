@@ -1,12 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-type User struct {
+type user struct {
 	UserID       uuid.UUID `json:"id"`
 	Email        string    `json:"email"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -20,4 +21,14 @@ type userResponse struct {
 	Email     string    `json:"email"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type workoutSessions struct {
+	ID          uuid.UUID
+	UserID      uuid.UUID
+	WorkoutDate time.Time
+	Description sql.NullString
+	Notes       sql.NullString
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }

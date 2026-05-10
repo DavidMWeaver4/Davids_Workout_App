@@ -106,3 +106,17 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 }
+
+func (cfg *apiConfig) getUserIDFromToken(w http.ResponseWriter, r *http.Request) (uuid.UUID, error) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Missing token", err)
+		return uuid.Nil, err
+	}
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
+		return uuid.Nil, err
+	}
+	return userID, nil
+}
