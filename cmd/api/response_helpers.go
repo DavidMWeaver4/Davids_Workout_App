@@ -8,11 +8,10 @@ import (
 	"strings"
 )
 
-/*
-	type msgResponse struct {
-		Message string `json:"message"`
-	}
-*/
+type msgResponse struct {
+	Message string `json:"message"`
+}
+
 func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 	if err != nil {
 		log.Println(err)

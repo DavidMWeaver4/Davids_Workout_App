@@ -112,10 +112,54 @@ func (q *Queries) GetAllWorkoutSessionsSorted(ctx context.Context, userID uuid.U
 	return items, nil
 }
 
+const getLastNWorkoutSessions = `-- name: GetLastNWorkoutSessions :many
+SELECT id, user_id, workout_date, description, notes, created_at, updated_at FROM workout_sessions
+WHERE user_id = $1
+ORDER BY workout_date DESC
+LIMIT $2
+`
+
+type GetLastNWorkoutSessionsParams struct {
+	UserID uuid.UUID
+	Limit  int32
+}
+
+func (q *Queries) GetLastNWorkoutSessions(ctx context.Context, arg GetLastNWorkoutSessionsParams) ([]WorkoutSession, error) {
+	rows, err := q.db.QueryContext(ctx, getLastNWorkoutSessions, arg.UserID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WorkoutSession
+	for rows.Next() {
+		var i WorkoutSession
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.WorkoutDate,
+			&i.Description,
+			&i.Notes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getLastWorkoutSession = `-- name: GetLastWorkoutSession :one
 SELECT id, user_id, workout_date, description, notes, created_at, updated_at FROM workout_sessions
 WHERE user_id = $1
 ORDER BY workout_date DESC
+LIMIT 1
 `
 
 func (q *Queries) GetLastWorkoutSession(ctx context.Context, userID uuid.UUID) (WorkoutSession, error) {
@@ -163,4 +207,27 @@ func (q *Queries) GetWorkoutSessionsCount(ctx context.Context, userID uuid.UUID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const updateWorkoutSession = `-- name: UpdateWorkoutSession :exec
+UPDATE workout_sessions
+SET workout_date = $1, description = $2, notes = $3, updated_at = NOW()
+WHERE id = $4
+`
+
+type UpdateWorkoutSessionParams struct {
+	WorkoutDate time.Time
+	Description sql.NullString
+	Notes       sql.NullString
+	ID          uuid.UUID
+}
+
+func (q *Queries) UpdateWorkoutSession(ctx context.Context, arg UpdateWorkoutSessionParams) error {
+	_, err := q.db.ExecContext(ctx, updateWorkoutSession,
+		arg.WorkoutDate,
+		arg.Description,
+		arg.Notes,
+		arg.ID,
+	)
+	return err
 }

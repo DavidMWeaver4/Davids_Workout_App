@@ -86,9 +86,6 @@ func (cfg *apiConfig) handlerChangeEmail(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusBadRequest, "Bad Request", err)
 		return
 	}
-	type msgResponse struct {
-		Message string `json:"message"`
-	}
 	respondWithJSON(w, http.StatusOK, msgResponse{"email updated"})
 }
 func (cfg *apiConfig) handlerChangePassword(w http.ResponseWriter, r *http.Request) {
@@ -118,9 +115,6 @@ func (cfg *apiConfig) handlerChangePassword(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to store to database", err)
 		return
-	}
-	type msgResponse struct {
-		Message string `json:"message"`
 	}
 	respondWithJSON(w, http.StatusOK, msgResponse{"password updated"})
 }
@@ -158,9 +152,6 @@ func (cfg *apiConfig) handlerDeleteMe(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to delete user from database", err)
 		return
-	}
-	type msgResponse struct {
-		Message string `json:"message"`
 	}
 	respondWithJSON(w, http.StatusOK, msgResponse{"user deleted"})
 }
