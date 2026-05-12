@@ -13,14 +13,14 @@ import (
 )
 
 func (cfg *apiConfig) handlerCreateWorkoutSession(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
 	type parameters struct {
 		WorkoutDate time.Time `json:"workout_date"`
 		Description string    `json:"description"`
 		Notes       string    `json:"notes"`
-	}
-	userID, err := cfg.getUserIDFromToken(w, r)
-	if err != nil {
-		return
 	}
 	decoder := json.NewDecoder(r.Body)
 	var params parameters
@@ -269,7 +269,87 @@ func (cfg *apiConfig) handlerCountSessions(w http.ResponseWriter, r *http.Reques
 	response := fmt.Sprintf("Your total workout sessions is: %d", count)
 	respondWithJSON(w, http.StatusOK, msgResponse{response})
 }
+func (cfg *apiConfig) handlerSearchWOSByDescription(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	query := r.URL.Query().Get("query")
+	if query == "" {
+		respondWithError(w, http.StatusBadRequest, "Missing search query", nil)
+		return
+	}
+	var workSess []database.WorkoutSession
+	workSess, err = cfg.db.SearchWorkoutSessionsByDescription(r.Context(), database.SearchWorkoutSessionsByDescriptionParams{
+		UserID: userID,
+		Column2: sql.NullString{
+			String: query,
+			Valid:  true,
+		},
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to search database", err)
+		return
+	}
+	response := make([]workoutSessions, 0)
+	for _, ws := range workSess {
+		response = append(response, workoutSessions{
+			ID:          ws.ID,
+			UserID:      ws.UserID,
+			WorkoutDate: ws.WorkoutDate,
+			Description: ws.Description,
+			Notes:       ws.Notes,
+			CreatedAt:   ws.CreatedAt,
+			UpdatedAt:   ws.UpdatedAt,
+		})
+	}
+	respondWithJSON(w, http.StatusOK, response)
 
-/*
- GET    /api/v1/workout-sessions/search
-*/
+}
+
+func (cfg *apiConfig) handlerSearchWOSByDateRange(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	startStr := r.URL.Query().Get("start")
+	endStr := r.URL.Query().Get("end")
+	if startStr == "" || endStr == "" {
+		respondWithError(w, http.StatusBadRequest, "2 dates are required to search", nil)
+		return
+	}
+	startDate, err := time.Parse(time.RFC3339, startStr)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid date format, expected: 2006-01-02T15:04:05Z", err)
+		return
+	}
+	endDate, err := time.Parse(time.RFC3339, endStr)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid date format, expected: 2006-01-02T15:04:05Z", err)
+		return
+	}
+	var workSess []database.WorkoutSession
+	workSess, err = cfg.db.SearchWorkoutSessionsByDateRange(r.Context(), database.SearchWorkoutSessionsByDateRangeParams{
+		UserID:        userID,
+		WorkoutDate:   startDate,
+		WorkoutDate_2: endDate,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to search database", err)
+		return
+	}
+	response := make([]workoutSessions, 0)
+	for _, ws := range workSess {
+		response = append(response, workoutSessions{
+			ID:          ws.ID,
+			UserID:      ws.UserID,
+			WorkoutDate: ws.WorkoutDate,
+			Description: ws.Description,
+			Notes:       ws.Notes,
+			CreatedAt:   ws.CreatedAt,
+			UpdatedAt:   ws.UpdatedAt,
+		})
+	}
+	respondWithJSON(w, http.StatusOK, response)
+
+}

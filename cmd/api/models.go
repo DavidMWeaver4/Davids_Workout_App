@@ -32,3 +32,13 @@ type workoutSessions struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }
+
+type WorkoutExercise struct {
+	ID               uuid.UUID
+	WorkoutSessionID uuid.UUID
+	ExerciseID       uuid.UUID
+	OrderIndex       int32
+	Notes            sql.NullString
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}

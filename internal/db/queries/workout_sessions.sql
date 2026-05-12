@@ -44,3 +44,15 @@ SELECT * FROM workout_sessions
 WHERE user_id = $1
 ORDER BY workout_date DESC
 LIMIT $2;
+
+-- name: SearchWorkoutSessionsByDescription :many
+SELECT * FROM workout_sessions
+WHERE user_id = $1
+AND description ILIKE '%' || $2 || '%'
+ORDER BY workout_date DESC;
+
+-- name: SearchWorkoutSessionsByDateRange :many
+SELECT * FROM workout_sessions
+WHERE user_id = $1
+AND workout_date BETWEEN $2 AND $3
+ORDER BY workout_date DESC;

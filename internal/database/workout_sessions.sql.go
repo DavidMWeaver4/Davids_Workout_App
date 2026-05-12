@@ -209,6 +209,93 @@ func (q *Queries) GetWorkoutSessionsCount(ctx context.Context, userID uuid.UUID)
 	return count, err
 }
 
+const searchWorkoutSessionsByDateRange = `-- name: SearchWorkoutSessionsByDateRange :many
+SELECT id, user_id, workout_date, description, notes, created_at, updated_at FROM workout_sessions
+WHERE user_id = $1
+AND workout_date BETWEEN $2 AND $3
+ORDER BY workout_date DESC
+`
+
+type SearchWorkoutSessionsByDateRangeParams struct {
+	UserID        uuid.UUID
+	WorkoutDate   time.Time
+	WorkoutDate_2 time.Time
+}
+
+func (q *Queries) SearchWorkoutSessionsByDateRange(ctx context.Context, arg SearchWorkoutSessionsByDateRangeParams) ([]WorkoutSession, error) {
+	rows, err := q.db.QueryContext(ctx, searchWorkoutSessionsByDateRange, arg.UserID, arg.WorkoutDate, arg.WorkoutDate_2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WorkoutSession
+	for rows.Next() {
+		var i WorkoutSession
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.WorkoutDate,
+			&i.Description,
+			&i.Notes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchWorkoutSessionsByDescription = `-- name: SearchWorkoutSessionsByDescription :many
+SELECT id, user_id, workout_date, description, notes, created_at, updated_at FROM workout_sessions
+WHERE user_id = $1
+AND description ILIKE '%' || $2 || '%'
+ORDER BY workout_date DESC
+`
+
+type SearchWorkoutSessionsByDescriptionParams struct {
+	UserID  uuid.UUID
+	Column2 sql.NullString
+}
+
+func (q *Queries) SearchWorkoutSessionsByDescription(ctx context.Context, arg SearchWorkoutSessionsByDescriptionParams) ([]WorkoutSession, error) {
+	rows, err := q.db.QueryContext(ctx, searchWorkoutSessionsByDescription, arg.UserID, arg.Column2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WorkoutSession
+	for rows.Next() {
+		var i WorkoutSession
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.WorkoutDate,
+			&i.Description,
+			&i.Notes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateWorkoutSession = `-- name: UpdateWorkoutSession :exec
 UPDATE workout_sessions
 SET workout_date = $1, description = $2, notes = $3, updated_at = NOW()
