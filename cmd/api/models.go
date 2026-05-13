@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,21 +23,21 @@ type userResponse struct {
 }
 
 type workoutSessions struct {
-	ID          uuid.UUID
-	UserID      uuid.UUID
-	WorkoutDate time.Time
-	Description sql.NullString
-	Notes       sql.NullString
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uuid.UUID `json:"id"`
+	UserID      uuid.UUID `json:"user_id"`
+	WorkoutDate time.Time `json:"workout_date"`
+	Description *string   `json:"description,omitempty"`
+	Notes       *string   `json:"notes,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-type WorkoutExercise struct {
-	ID               uuid.UUID
-	WorkoutSessionID uuid.UUID
-	ExerciseID       uuid.UUID
-	OrderIndex       int32
-	Notes            sql.NullString
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+type workoutExercise struct {
+	ID               uuid.UUID `json:"id"`
+	WorkoutSessionID uuid.UUID `json:"workout_session_id"`
+	ExerciseID       uuid.UUID `json:"exercise_id"`
+	OrderIndex       int32     `json:"order_index"`
+	Notes            *string   `json:"notes,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }

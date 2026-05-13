@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -52,4 +53,11 @@ func checkEmail(email string) ([]string, error) {
 		return nil, fmt.Errorf("invalid email format: missing @ symbol")
 	}
 	return parts, nil
+}
+
+func nullStringToPtr(ns sql.NullString) *string {
+	if ns.Valid {
+		return &ns.String
+	}
+	return nil
 }

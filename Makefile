@@ -21,10 +21,10 @@ clean:
 	docker system prune -f
 
 migrate-up:
-	goose -dir db/migrations postgres "$(DB_URL)" up
+	goose -dir internal/db/migrations postgres "$(DB_URL)" up
 
 migrate-down:
-	goose -dir db/migrations postgres "$(DB_URL)" down
+	goose -dir internal/db/migrations postgres "$(DB_URL)" down
 
 sqlc:
 	sqlc generate

@@ -101,6 +101,28 @@ func (q *Queries) GetExerciseFromID(ctx context.Context, id uuid.UUID) (Exercise
 	return i, err
 }
 
+const getExerciseFromName = `-- name: GetExerciseFromName :one
+SELECT id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description FROM exercises
+WHERE exercise_name = $1
+`
+
+func (q *Queries) GetExerciseFromName(ctx context.Context, exerciseName string) (Exercise, error) {
+	row := q.db.QueryRowContext(ctx, getExerciseFromName, exerciseName)
+	var i Exercise
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ExerciseName,
+		pq.Array(&i.TargetMuscles),
+		&i.Equipment,
+		&i.DifficultyLevel,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Description,
+	)
+	return i, err
+}
+
 const getExercisesFromUser = `-- name: GetExercisesFromUser :many
 SELECT id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description FROM exercises
 WHERE user_id = $1
@@ -222,44 +244,6 @@ WHERE $1 = ANY(target_muscles)
 
 func (q *Queries) GetSameMuscleExercises(ctx context.Context, targetMuscles []string) ([]Exercise, error) {
 	rows, err := q.db.QueryContext(ctx, getSameMuscleExercises, pq.Array(targetMuscles))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Exercise
-	for rows.Next() {
-		var i Exercise
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.ExerciseName,
-			pq.Array(&i.TargetMuscles),
-			&i.Equipment,
-			&i.DifficultyLevel,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Description,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getSameNamedExercises = `-- name: GetSameNamedExercises :many
-SELECT id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description FROM exercises
-WHERE exercise_name = $1
-`
-
-func (q *Queries) GetSameNamedExercises(ctx context.Context, exerciseName string) ([]Exercise, error) {
-	rows, err := q.db.QueryContext(ctx, getSameNamedExercises, exerciseName)
 	if err != nil {
 		return nil, err
 	}

@@ -17,7 +17,7 @@ RETURNING *;
 SELECT * FROM exercises
 WHERE id = $1;
 
--- name: GetSameNamedExercises :many
+-- name: GetExerciseFromName :one
 SELECT * FROM exercises
 WHERE exercise_name = $1;
 
