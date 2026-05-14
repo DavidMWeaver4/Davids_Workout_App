@@ -161,9 +161,97 @@ func (cfg *apiConfig) handlerGetWorkoutExercisesInSession(w http.ResponseWriter,
 
 }
 
+func (cfg *apiConfig) handlerDeleteWorkoutExercises(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	idString := r.PathValue("id")
+	var workoutExercise uuid.UUID
+	if idString == "" {
+		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
+		return
+	}
+	workoutExercise, err = uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
+		return
+	}
+	exercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), workoutExercise)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
+		return
+	}
+	workoutSession := exercise.WorkoutSessionID
+	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workoutSession)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found", err)
+		return
+	}
+	if workSess.UserID != userID {
+		respondWithError(w, http.StatusForbidden, "Not your exercise session", nil)
+		return
+	}
+	err = cfg.db.DeleteWorkoutExercises(r.Context(), database.DeleteWorkoutExercisesParams{
+		ID:               workoutExercise,
+		WorkoutSessionID: workoutSession,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not delete from database", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, msgResponse{"successfully deleted"})
+}
+
+func (cfg *apiConfig) handlerGetWorkoutsInSession(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	idString := r.PathValue("id")
+	var workoutSession uuid.UUID
+	if idString == "" {
+		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
+		return
+	}
+	workoutSession, err = uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
+		return
+	}
+	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workoutSession)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found", err)
+		return
+	}
+	if workSess.UserID != userID {
+		respondWithError(w, http.StatusForbidden, "Not your exercise session", nil)
+		return
+	}
+	var workExer []database.WorkoutExercise
+	workExer, err = cfg.db.GetWorkoutsInSession(r.Context(), workoutSession)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not retrieve from database", err)
+		return
+	}
+	response := make([]workoutExercise, 0)
+	for _, ws := range workExer {
+		response = append(response, workoutExercise{
+			ID:               ws.ID,
+			WorkoutSessionID: ws.WorkoutSessionID,
+			ExerciseID:       ws.ExerciseID,
+			OrderIndex:       ws.OrderIndex,
+			Notes:            nullStringToPtr(ws.Notes),
+			CreatedAt:        ws.CreatedAt,
+			UpdatedAt:        ws.UpdatedAt,
+		})
+	}
+	respondWithJSON(w, http.StatusOK, response)
+
+}
+
 /*
  * updateeworkoutexerciseorder
- * deleteworkoutexercise
  * getworkoutexercisecount
  *
  */
