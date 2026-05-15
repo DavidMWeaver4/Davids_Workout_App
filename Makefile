@@ -11,14 +11,14 @@ build:
 up:
 	docker compose up -d
 
-down:
-	docker compose down
-
 shell:
 	docker exec -it $(CONTAINER_NAME) /bin/bash
 
+down:
+	docker compose down --remove-orphans
+
 clean:
-	docker system prune -f
+	docker compose down --volumes --remove-orphans
 
 migrate-up:
 	goose -dir internal/db/migrations postgres "$(DB_URL)" up
@@ -28,3 +28,18 @@ migrate-down:
 
 sqlc:
 	sqlc generate
+
+run:
+	go run ./cmd/api/
+
+help:
+	@echo "Available commands:"
+	@echo "  make build         Build docker image"
+	@echo "  make up            Start containers"
+	@echo "  make down          Stop containers"
+    @echo "  make clean         Stop containers and wipe volumes"
+	@echo "  make migrate-up    Run DB migrations"
+	@echo "  make run           Run API locally"
+	@echo "  make shell         Open shell in container"
+    @echo "  make migrate-down  Roll back last migration"
+    @echo "  make sqlc          Regenerate sqlc code"
