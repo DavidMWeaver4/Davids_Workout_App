@@ -35,10 +35,10 @@ Docker (I built on version 4.71.0)
 make up          # start the database
 make migrate-up  # run migrations
 make run         # start the API
-
+```
 A few simple commands to test.
 
-`
+```
 # register
 curl -X POST http://localhost:8080/api/v1/register \
   -H "Content-Type: application/json" \
@@ -52,7 +52,7 @@ curl -X POST http://localhost:8080/api/v1/login \
 # authenticated request
 curl -X GET http://localhost:8080/api/v1/users/me \
   -H "Authorization: Bearer <token_from_login>"
-`
+```
 
 
 
