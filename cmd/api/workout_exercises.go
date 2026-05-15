@@ -203,7 +203,7 @@ func (cfg *apiConfig) handlerDeleteWorkoutExercises(w http.ResponseWriter, r *ht
 	respondWithJSON(w, http.StatusOK, msgResponse{"successfully deleted"})
 }
 
-func (cfg *apiConfig) handlerGetWorkoutsInSession(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerGetNumOfWorkoutsInSession(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
@@ -234,24 +234,13 @@ func (cfg *apiConfig) handlerGetWorkoutsInSession(w http.ResponseWriter, r *http
 		respondWithError(w, http.StatusInternalServerError, "Could not retrieve from database", err)
 		return
 	}
-	response := make([]workoutExercise, 0)
-	for _, ws := range workExer {
-		response = append(response, workoutExercise{
-			ID:               ws.ID,
-			WorkoutSessionID: ws.WorkoutSessionID,
-			ExerciseID:       ws.ExerciseID,
-			OrderIndex:       ws.OrderIndex,
-			Notes:            nullStringToPtr(ws.Notes),
-			CreatedAt:        ws.CreatedAt,
-			UpdatedAt:        ws.UpdatedAt,
-		})
+	type countResponse struct {
+		Count int `json:"count"`
 	}
-	respondWithJSON(w, http.StatusOK, response)
-
+	respondWithJSON(w, http.StatusOK, countResponse{Count: len(workExer)})
 }
 
 /*
  * updateeworkoutexerciseorder
- * getworkoutexercisecount
  *
  */

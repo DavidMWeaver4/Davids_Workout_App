@@ -70,28 +70,3 @@ func CheckPasswordHash(password, hash string) (bool, error) {
 	}
 	return match, nil
 }
-
-/*
-	TOKEN ROTATION LOGIC
-
-func RotateRefreshToken()(string, err){
-hashedToken := hashToken(rawToken)
-token, err := database.GetRefreshToken(ctx, hashedToken)
-if err != nil { // not found
-
-	    return unauthorized
-	}
-
-	if token.IsRevoked || token.ExpiresAt.Before(time.Now()) {
-	    return unauthorized
-	}
-
-db.RevokeRefreshToken(ctx, hashedToken)
-
-newJWT := generateJWT(token.UserID)
-newRawToken := generateRandomToken()
-newHashedToken := hashToken(newRawToken)
-database.CreateRefreshToken(ctx, newHashedToken, token.UserID, ...)
-//return
-}
-*/

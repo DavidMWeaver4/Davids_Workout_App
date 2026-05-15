@@ -34,17 +34,17 @@ func (cfg *apiConfig) handlerRegister(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    time.Now().UTC(),
 		UpdatedAt:    time.Now().UTC(),
 	}
-	user, err := cfg.db.CreateUser(r.Context(), dbparams)
+	use, err := cfg.db.CreateUser(r.Context(), dbparams)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error storing user in database", err)
 		return
 	}
 
-	respondWithJSON(w, http.StatusCreated, User{
-		UserID:    user.ID,
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
+	respondWithJSON(w, http.StatusCreated, user{
+		UserID:    use.ID,
+		Email:     use.Email,
+		CreatedAt: use.CreatedAt,
+		UpdatedAt: use.UpdatedAt,
 	})
 }
 
@@ -60,12 +60,12 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Error decoding JSON", err)
 		return
 	}
-	user, err := cfg.db.GetUserFromEmail(r.Context(), params.Email)
+	use, err := cfg.db.GetUserFromEmail(r.Context(), params.Email)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't retrieve user", err)
 		return
 	}
-	isValid, err := auth.CheckPasswordHash(params.Password, user.PasswordHash)
+	isValid, err := auth.CheckPasswordHash(params.Password, use.PasswordHash)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Internal Error", nil)
 		return
@@ -79,7 +79,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create JWT", err)
 		return
 	}
-	jwtString, err := auth.MakeJWT(user.ID, cfg.jwtSecret, time.Hour)
+	jwtString, err := auth.MakeJWT(use.ID, cfg.jwtSecret, time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create JWT string", err)
 		return
@@ -87,7 +87,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	hashedToken := auth.HashToken(rawToken)
 	_, err = cfg.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
 		HashedToken: hashedToken,
-		UserID:      user.ID,
+		UserID:      use.ID,
 		ExpiresAt:   time.Now().UTC().Add(15 * 24 * time.Hour),
 		CreatedAt:   time.Now().UTC(),
 		UpdatedAt:   time.Now().UTC(),
@@ -96,11 +96,11 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create refresh token", err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, User{
-		UserID:       user.ID,
-		CreatedAt:    user.CreatedAt,
-		UpdatedAt:    user.UpdatedAt,
-		Email:        user.Email,
+	respondWithJSON(w, http.StatusOK, user{
+		UserID:       use.ID,
+		CreatedAt:    use.CreatedAt,
+		UpdatedAt:    use.UpdatedAt,
+		Email:        use.Email,
 		Token:        jwtString,
 		RefreshToken: rawToken,
 	})
