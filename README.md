@@ -1,5 +1,5 @@
 David's Workout App
->This project is not finish and is in active development
+>This project is not finished and is in active development
 
 Recently, I started focusing more on fitness and wanted a simple way to plan and track workouts. Most workout apps I tried required expensive monthly subscriptions to create your own workouts and were heavily focused on AI features that felt unnecessary for basic workout tracking.
 
@@ -38,7 +38,7 @@ make run         # start the API
 ```
 A few simple commands to test.
 
-```
+```bash
 # register
 curl -X POST http://localhost:8080/api/v1/register \
   -H "Content-Type: application/json" \
@@ -54,11 +54,20 @@ curl -X GET http://localhost:8080/api/v1/users/me \
   -H "Authorization: Bearer <token_from_login>"
 ```
 
+## API Endpoints
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | /api/v1/register | Create account | No |
+| POST | /api/v1/login | Login | No |
+| GET | /api/v1/users/me | Get profile | Yes |
+| POST | /api/v1/workout_sessions | Create session | Yes |
 
 
->TODO List
-exercise handlers
-weights and sets handlers
-cardio handlers
-go unit tests
-CI/CD tests
+
+## TODO
+- [ ] List exercise handlers
+- [ ] Weights and sets handlers
+- [ ] Cardio handlers
+- [ ] Unit tests
+- [ ] CI/CD pipeline
