@@ -1,6 +1,7 @@
-David's Workout App
+## David's Workout App
 >This project is not finished and is in active development
 
+## Motivations
 Recently, I started focusing more on fitness and wanted a simple way to plan and track workouts. Most workout apps I tried required expensive monthly subscriptions to create your own workouts and were heavily focused on AI features that felt unnecessary for basic workout tracking.
 
 I decided to build my own workout app both as a personal tool and as a way to improve my software engineering skills.
@@ -16,12 +17,13 @@ This application allows users to:
 The backend is built with Go and PostgreSQL. SQLC is used to generate type safe database queries, and Goose handles database migrations. The project is designed with Docker based deployment in mind.
 
 Tools used in project:
-Golang / PostgreSQL / Sqlc
-Docker / JWT / Goose
+- Golang / PostgreSQL / Sqlc
+- Docker / JWT / Goose
 
 In order to run this application you need:
-Golang 1.25.6
-Docker (I built on version 4.71.0)
+- Golang 1.25.6
+- Docker (I built on version 4.71.0)
+
 
 
 ## Getting Started
@@ -30,12 +32,14 @@ Docker (I built on version 4.71.0)
 2. Copy `.env.example` to `.env` and fill in your values
 3. Run `make help` to see all available commands
 
-### Quick Start
+## Quick Start
 ```bash
 make up          # start the database
 make migrate-up  # run migrations
 make run         # start the API
 ```
+
+## Usage
 A few simple commands to test.
 
 ```bash
@@ -54,7 +58,7 @@ curl -X GET http://localhost:8080/api/v1/users/me \
   -H "Authorization: Bearer <token_from_login>"
 ```
 
-## API Endpoints
+### API Endpoints
 
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
@@ -63,7 +67,32 @@ curl -X GET http://localhost:8080/api/v1/users/me \
 | GET | /api/v1/users/me | Get profile | Yes |
 | POST | /api/v1/workout_sessions | Create session | Yes |
 
+## Contributing
 
+### Clone the repo
+
+```bash
+git clone https://github.com/DavidMWeaver4/Davids_Workout_App
+cd workout_app
+```
+
+### Build the compiled binary
+
+```bash
+go build
+```
+
+> Sorry, test suite is still TODO
+
+### Run the test suite
+
+```bash
+go test ./...
+```
+
+### Submit a pull request
+
+If you'd like to contribute, please fork the repository and open a pull request to the `main` branch.
 
 ## TODO
 - [ ] List exercise handlers
