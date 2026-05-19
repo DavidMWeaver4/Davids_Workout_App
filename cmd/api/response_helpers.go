@@ -61,3 +61,10 @@ func nullStringToPtr(ns sql.NullString) *string {
 	}
 	return nil
 }
+
+func nullInt32ToPtr(v sql.NullInt32) *int32 {
+	if v.Valid {
+		return &v.Int32
+	}
+	return nil
+}

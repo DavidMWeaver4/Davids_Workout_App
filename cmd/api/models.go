@@ -41,3 +41,17 @@ type workoutExercise struct {
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
+
+type weightAndSets struct {
+	ID                 uuid.UUID `json:"id"`
+	WorkoutExercisesID uuid.UUID `json:"workout_exercises_id"`
+	Weight             string    `json:"weight"`
+	IsKilograms        bool      `json:"is_kilogram"`
+	SetNumber          int32     `json:"set_number"`
+	RepsTarget         int32     `json:"reps_target"`
+	RepsActual         int32     `json:"reps_actual"`
+	DurationSeconds    *int32    `json:"duration_seconds,omitempty"`
+	RestTimeSeconds    *int32    `json:"rest_time_seconds,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
