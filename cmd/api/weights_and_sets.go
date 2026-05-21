@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	database "command-line-arguments/Users/dmweaver/workspace/bootdotdev/workout_app/internal/database/weights_and_sets.sql.go"
+
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
 	"github.com/google/uuid"
 )
@@ -134,4 +136,50 @@ func (cfg *apiConfig) handlerGetAllSetsFromSession(w http.ResponseWriter, r *htt
 		})
 	}
 	respondWithJSON(w, http.StatusOK, response)
+}
+
+func (cfg *apiConfig) handlerDeleteWeightandSet(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	idString := r.PathValue("id")
+	var weightSetID uuid.UUID
+	if idString == "" {
+		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
+		return
+	}
+	weightSetID, err = uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		return
+	}
+	weightSet, err := cfg.db.GetWeightSetByID(r.Context(), weightSetID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Weight set not found", err)
+		return
+	}
+	work_exercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), weightSet.WorkoutExercisesID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
+		return
+	}
+	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), work_exercise.WorkoutSessionID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Session not found", err)
+		return
+	}
+	if workSess.UserID != userID {
+		respondWithError(w, http.StatusForbidden, "Not your session", nil)
+		return
+	}
+	err = cfg.db.DeleteWeightAndSets(r.Context(), database.DeleteWeightAndSetsParams{
+		ID:                 weightSet.ID,
+		WorkoutExercisesID: weightSet.WorkoutExercisesID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error deleting from database", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, msgResponse{"Deletion successful"})
 }
