@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -48,15 +47,7 @@ func (cfg *apiConfig) handlerCreateWorkoutSession(w http.ResponseWriter, r *http
 		respondWithError(w, http.StatusInternalServerError, "Error storing to database", err)
 		return
 	}
-	respondWithJSON(w, http.StatusCreated, workoutSessions{
-		ID:          workoutSession.ID,
-		UserID:      workoutSession.UserID,
-		WorkoutDate: workoutSession.WorkoutDate,
-		Description: nullStringToPtr(workoutSession.Description),
-		Notes:       nullStringToPtr(workoutSession.Notes),
-		CreatedAt:   workoutSession.CreatedAt,
-		UpdatedAt:   workoutSession.UpdatedAt,
-	})
+	respondWithJSON(w, http.StatusCreated, dbSessionToResponse(workoutSession))
 
 }
 func (cfg *apiConfig) handlerGetAllMyWorkoutSessions(w http.ResponseWriter, r *http.Request) {
@@ -74,15 +65,7 @@ func (cfg *apiConfig) handlerGetAllMyWorkoutSessions(w http.ResponseWriter, r *h
 	response := make([]workoutSessions, 0)
 
 	for _, ws := range workSess {
-		response = append(response, workoutSessions{
-			ID:          ws.ID,
-			UserID:      ws.UserID,
-			WorkoutDate: ws.WorkoutDate,
-			Description: nullStringToPtr(ws.Description),
-			Notes:       nullStringToPtr(ws.Notes),
-			CreatedAt:   ws.CreatedAt,
-			UpdatedAt:   ws.UpdatedAt,
-		})
+		response = append(response, dbSessionToResponse(ws))
 	}
 
 	respondWithJSON(w, http.StatusOK, response)
@@ -93,7 +76,7 @@ func (cfg *apiConfig) handlerGetWorkoutSessionById(w http.ResponseWriter, r *htt
 	if err != nil {
 		return
 	}
-	idString := r.URL.Query().Get("id")
+	idString := r.PathValue("id")
 	var ID uuid.UUID
 	if idString == "" {
 		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
@@ -113,15 +96,7 @@ func (cfg *apiConfig) handlerGetWorkoutSessionById(w http.ResponseWriter, r *htt
 		respondWithError(w, http.StatusForbidden, "Not your session", nil)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, workoutSessions{
-		ID:          workSess.ID,
-		UserID:      workSess.UserID,
-		WorkoutDate: workSess.WorkoutDate,
-		Description: nullStringToPtr(workSess.Description),
-		Notes:       nullStringToPtr(workSess.Notes),
-		CreatedAt:   workSess.CreatedAt,
-		UpdatedAt:   workSess.UpdatedAt,
-	})
+	respondWithJSON(w, http.StatusOK, dbSessionToResponse(workSess))
 }
 func (cfg *apiConfig) handlerUpdateWorkoutSession(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
@@ -129,7 +104,6 @@ func (cfg *apiConfig) handlerUpdateWorkoutSession(w http.ResponseWriter, r *http
 		return
 	}
 	type parameters struct {
-		ID          uuid.UUID `json:"id"`
 		WorkoutDate time.Time `json:"workout_date"`
 		Description string    `json:"description"`
 		Notes       string    `json:"notes"`
@@ -141,7 +115,14 @@ func (cfg *apiConfig) handlerUpdateWorkoutSession(w http.ResponseWriter, r *http
 		respondWithError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
-	checkSession, err := cfg.db.GetWorkoutSessionByID(r.Context(), params.ID)
+	idString := r.PathValue("id")
+	ID, err := uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		return
+	}
+
+	checkSession, err := cfg.db.GetWorkoutSessionByID(r.Context(), ID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't check database", err)
 		return
@@ -161,7 +142,7 @@ func (cfg *apiConfig) handlerUpdateWorkoutSession(w http.ResponseWriter, r *http
 			String: params.Notes,
 			Valid:  params.Notes != "",
 		},
-		ID: params.ID,
+		ID: ID,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't update database", err)
@@ -176,12 +157,8 @@ func (cfg *apiConfig) handlerDeleteWorkoutSession(w http.ResponseWriter, r *http
 	if err != nil {
 		return
 	}
-	idString := r.URL.Query().Get("id")
+	idString := r.PathValue("id")
 	var iD uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
 	iD, err = uuid.Parse(idString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
@@ -208,15 +185,7 @@ func (cfg *apiConfig) handlerGetMyLastSession(w http.ResponseWriter, r *http.Req
 		respondWithError(w, http.StatusNotFound, "No sessions found", err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, workoutSessions{
-		ID:          workSess.ID,
-		UserID:      workSess.UserID,
-		WorkoutDate: workSess.WorkoutDate,
-		Description: nullStringToPtr(workSess.Description),
-		Notes:       nullStringToPtr(workSess.Notes),
-		CreatedAt:   workSess.CreatedAt,
-		UpdatedAt:   workSess.UpdatedAt,
-	})
+	respondWithJSON(w, http.StatusOK, dbSessionToResponse(workSess))
 }
 
 func (cfg *apiConfig) handlerGetMyXNumberLastSessions(w http.ResponseWriter, r *http.Request) {
@@ -244,15 +213,7 @@ func (cfg *apiConfig) handlerGetMyXNumberLastSessions(w http.ResponseWriter, r *
 	}
 	response := make([]workoutSessions, 0)
 	for _, ws := range workSess {
-		response = append(response, workoutSessions{
-			ID:          ws.ID,
-			UserID:      ws.UserID,
-			WorkoutDate: ws.WorkoutDate,
-			Description: nullStringToPtr(ws.Description),
-			Notes:       nullStringToPtr(ws.Notes),
-			CreatedAt:   ws.CreatedAt,
-			UpdatedAt:   ws.UpdatedAt,
-		})
+		response = append(response, dbSessionToResponse(ws))
 	}
 	respondWithJSON(w, http.StatusOK, response)
 }
@@ -266,8 +227,10 @@ func (cfg *apiConfig) handlerCountSessions(w http.ResponseWriter, r *http.Reques
 		respondWithError(w, http.StatusInternalServerError, "Failed to get count", err)
 		return
 	}
-	response := fmt.Sprintf("Your total workout sessions is: %d", count)
-	respondWithJSON(w, http.StatusOK, msgResponse{response})
+	type countResponse struct {
+		Count int64 `json:"count"`
+	}
+	respondWithJSON(w, http.StatusOK, countResponse{Count: count})
 }
 func (cfg *apiConfig) handlerSearchWOSByDescription(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
@@ -293,15 +256,7 @@ func (cfg *apiConfig) handlerSearchWOSByDescription(w http.ResponseWriter, r *ht
 	}
 	response := make([]workoutSessions, 0)
 	for _, ws := range workSess {
-		response = append(response, workoutSessions{
-			ID:          ws.ID,
-			UserID:      ws.UserID,
-			WorkoutDate: ws.WorkoutDate,
-			Description: nullStringToPtr(ws.Description),
-			Notes:       nullStringToPtr(ws.Notes),
-			CreatedAt:   ws.CreatedAt,
-			UpdatedAt:   ws.UpdatedAt,
-		})
+		response = append(response, dbSessionToResponse(ws))
 	}
 	respondWithJSON(w, http.StatusOK, response)
 
@@ -340,16 +295,21 @@ func (cfg *apiConfig) handlerSearchWOSByDateRange(w http.ResponseWriter, r *http
 	}
 	response := make([]workoutSessions, 0)
 	for _, ws := range workSess {
-		response = append(response, workoutSessions{
-			ID:          ws.ID,
-			UserID:      ws.UserID,
-			WorkoutDate: ws.WorkoutDate,
-			Description: nullStringToPtr(ws.Description),
-			Notes:       nullStringToPtr(ws.Notes),
-			CreatedAt:   ws.CreatedAt,
-			UpdatedAt:   ws.UpdatedAt,
-		})
+		response = append(response, dbSessionToResponse(ws))
 	}
 	respondWithJSON(w, http.StatusOK, response)
 
+}
+
+// response helper
+func dbSessionToResponse(ws database.WorkoutSession) workoutSessions {
+	return workoutSessions{
+		ID:          ws.ID,
+		UserID:      ws.UserID,
+		WorkoutDate: ws.WorkoutDate,
+		Description: nullStringToPtr(ws.Description),
+		Notes:       nullStringToPtr(ws.Notes),
+		CreatedAt:   ws.CreatedAt,
+		UpdatedAt:   ws.UpdatedAt,
+	}
 }

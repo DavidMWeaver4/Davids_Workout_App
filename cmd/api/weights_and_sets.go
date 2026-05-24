@@ -1,9 +1,10 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
@@ -19,7 +20,7 @@ func (cfg *apiConfig) handlerCreateWeightsAndSets(w http.ResponseWriter, r *http
 	}
 	type parameters struct {
 		WorkoutExercisesID uuid.UUID `json:"workout_exercises_id"`
-		Weight             string    `json:"weight"`
+		Weight             float64   `json:"weight"`
 		IsKilogram         bool      `json:"is_kilogram"`
 		SetNumber          int32     `json:"set_number"`
 		RepsTarget         int32     `json:"reps_target"`
@@ -34,18 +35,9 @@ func (cfg *apiConfig) handlerCreateWeightsAndSets(w http.ResponseWriter, r *http
 		respondWithError(w, http.StatusInternalServerError, "Error decoding JSON", err)
 		return
 	}
-	workExercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), params.WorkoutExercisesID)
+	_, err = cfg.authorizeWorkoutExercise(r.Context(), params.WorkoutExercisesID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
-		return
-	}
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workExercise.WorkoutSessionID)
-	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found", err)
-		return
-	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your session", nil)
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
 		return
 	}
 	weightSet, err := cfg.db.CreateWeightsAndSets(r.Context(), database.CreateWeightsAndSetsParams{
@@ -99,18 +91,9 @@ func (cfg *apiConfig) handlerGetAllSetsFromSession(w http.ResponseWriter, r *htt
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
 		return
 	}
-	workExercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), workoutExerciseID)
+	_, err = cfg.authorizeWorkoutExercise(r.Context(), workoutExerciseID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
-		return
-	}
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workExercise.WorkoutSessionID)
-	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found", err)
-		return
-	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your session", nil)
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
 		return
 	}
 	setsInSession, err := cfg.db.GetAllSetsFromSession(r.Context(), workoutExerciseID)
@@ -153,23 +136,9 @@ func (cfg *apiConfig) handlerDeleteWeightandSet(w http.ResponseWriter, r *http.R
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
 		return
 	}
-	weightSet, err := cfg.db.GetWeightAndSetFromID(r.Context(), weightSetID)
+	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Weight set not found", err)
-		return
-	}
-	workExercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), weightSet.WorkoutExercisesID)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
-		return
-	}
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workExercise.WorkoutSessionID)
-	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found", err)
-		return
-	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your session", nil)
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
 		return
 	}
 	err = cfg.db.DeleteWeightAndSets(r.Context(), database.DeleteWeightAndSetsParams{
@@ -190,7 +159,7 @@ func (cfg *apiConfig) handlerUpdateWeightAndSets(w http.ResponseWriter, r *http.
 	}
 	type parameters struct {
 		WorkoutExercisesID uuid.UUID `json:"workout_exercises_id"`
-		Weight             string    `json:"weight"`
+		Weight             float64   `json:"weight"`
 		IsKilograms        bool      `json:"is_kilogram"`
 		SetNumber          int32     `json:"set_number"`
 		RepsTarget         int32     `json:"reps_target"`
@@ -205,18 +174,15 @@ func (cfg *apiConfig) handlerUpdateWeightAndSets(w http.ResponseWriter, r *http.
 		respondWithError(w, http.StatusInternalServerError, "Error decoding JSON", err)
 		return
 	}
-	workExercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), params.WorkoutExercisesID)
+	idString := r.PathValue("id")
+	setID, err := uuid.Parse(idString)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
 		return
 	}
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workExercise.WorkoutSessionID)
+	weightSet, err := cfg.authorizeWeightSet(r.Context(), setID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found", err)
-		return
-	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your session", nil)
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
 		return
 	}
 	updatedSet, err := cfg.db.UpdateWeightsAndSets(r.Context(), database.UpdateWeightsAndSetsParams{
@@ -224,6 +190,7 @@ func (cfg *apiConfig) handlerUpdateWeightAndSets(w http.ResponseWriter, r *http.
 		IsKilograms: params.IsKilograms,
 		SetNumber:   params.SetNumber,
 		RepsTarget:  params.RepsTarget,
+		RepsActual:  params.RepsActual,
 		DurationSeconds: sql.NullInt32{
 			Int32: params.DurationSeconds,
 			Valid: params.DurationSeconds != 0,
@@ -232,14 +199,14 @@ func (cfg *apiConfig) handlerUpdateWeightAndSets(w http.ResponseWriter, r *http.
 			Int32: params.RestTimeSeconds,
 			Valid: params.RestTimeSeconds != 0,
 		},
-		ID:                 workExercise.ID,
-		WorkoutExercisesID: params.WorkoutExercisesID,
+		ID:                 setID,
+		WorkoutExercisesID: weightSet.WorkoutExercisesID,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to update database", err)
 		return
 	}
-	respondWithJSON(w, http.StatusCreated, weightAndSets{
+	respondWithJSON(w, http.StatusOK, weightAndSets{
 		ID:                 updatedSet.ID,
 		WorkoutExercisesID: updatedSet.WorkoutExercisesID,
 		Weight:             updatedSet.Weight,
@@ -267,26 +234,12 @@ func (cfg *apiConfig) handlerGetVolumeSet(w http.ResponseWriter, r *http.Request
 	}
 	weightSetID, err = uuid.Parse(idString)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
 		return
 	}
-	weightSet, err := cfg.db.GetWeightAndSetFromID(r.Context(), weightSetID)
+	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Weight set not found", err)
-		return
-	}
-	workExercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), weightSet.WorkoutExercisesID)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
-		return
-	}
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workExercise.WorkoutSessionID)
-	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found", err)
-		return
-	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your session", nil)
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
 		return
 	}
 	setVolume, err := cfg.db.GetSetVolume(r.Context(), database.GetSetVolumeParams{
@@ -297,12 +250,47 @@ func (cfg *apiConfig) handlerGetVolumeSet(w http.ResponseWriter, r *http.Request
 		respondWithError(w, http.StatusBadRequest, "Set not found", err)
 		return
 	}
-	response := fmt.Sprintf("Set volume: %d", setVolume)
-	respondWithJSON(w, http.StatusOK, response)
+	type volumeResponse struct {
+		Volume float64 `json:"volume"`
+	}
+
+	respondWithJSON(w, http.StatusOK, volumeResponse{Volume: float64(setVolume)})
+}
+
+// Helper functions
+func (cfg *apiConfig) authorizeWorkoutExercise(ctx context.Context, workoutExerciseID uuid.UUID, userID uuid.UUID) (database.WorkoutExercise, error) {
+
+	workExercise, err := cfg.db.GetWorkoutExerciseFromID(ctx, workoutExerciseID)
+	if err != nil {
+		return database.WorkoutExercise{}, err
+	}
+
+	workSess, err := cfg.db.GetWorkoutSessionByID(ctx, workExercise.WorkoutSessionID)
+	if err != nil {
+		return database.WorkoutExercise{}, err
+	}
+
+	if workSess.UserID != userID {
+		return database.WorkoutExercise{}, errors.New("forbidden")
+	}
+
+	return workExercise, nil
+}
+func (cfg *apiConfig) authorizeWeightSet(ctx context.Context, weightSetID uuid.UUID, userID uuid.UUID) (database.WeightsAndSet, error) {
+
+	weightSet, err := cfg.db.GetWeightAndSetFromID(ctx, weightSetID)
+	if err != nil {
+		return database.WeightsAndSet{}, err
+	}
+
+	_, err = cfg.authorizeWorkoutExercise(ctx, weightSet.WorkoutExercisesID, userID)
+	if err != nil {
+		return database.WeightsAndSet{}, err
+	}
+
+	return weightSet, nil
 }
 
 //TODO
-// GetSetVolume
 // GetTotalVolumeFromAllSets
 // GetTotalDurationFromAllSets
-// UpdatedWeightAndSets

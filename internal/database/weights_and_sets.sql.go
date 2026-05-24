@@ -34,7 +34,7 @@ RETURNING id, workout_exercises_id, weight, is_kilograms, set_number, reps_targe
 type CreateWeightsAndSetsParams struct {
 	ID                 uuid.UUID
 	WorkoutExercisesID uuid.UUID
-	Weight             string
+	Weight             float64
 	IsKilograms        bool
 	SetNumber          int32
 	RepsTarget         int32
@@ -229,7 +229,7 @@ RETURNING id, workout_exercises_id, weight, is_kilograms, set_number, reps_targe
 `
 
 type UpdateWeightsAndSetsParams struct {
-	Weight             string
+	Weight             float64
 	IsKilograms        bool
 	SetNumber          int32
 	RepsTarget         int32

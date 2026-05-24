@@ -54,7 +54,7 @@ type User struct {
 type WeightsAndSet struct {
 	ID                 uuid.UUID
 	WorkoutExercisesID uuid.UUID
-	Weight             string
+	Weight             float64
 	IsKilograms        bool
 	SetNumber          int32
 	RepsTarget         int32
