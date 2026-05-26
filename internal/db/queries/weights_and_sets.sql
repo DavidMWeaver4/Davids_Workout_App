@@ -24,19 +24,19 @@ SELECT * FROM weights_and_sets
 WHERE workout_exercises_id = $1;
 
 -- name: GetSetVolume :one
-SELECT reps_actual * weight FROM weights_and_sets
+SELECT (reps_actual * weight)::float8 FROM weights_and_sets
 WHERE id = $1 AND workout_exercises_id = $2;
 
 -- name: GetTotalVolumeFromAllSets :one
-SELECT SUM(reps_actual * weight) FROM weights_and_sets
+SELECT COALESCE(SUM(reps_actual * weight), 0)::float8 FROM weights_and_sets
 WHERE workout_exercises_id = $1;
 
 -- name: GetTotalDuration :one
-SELECT duration_seconds + rest_time_seconds FROM weights_and_sets
+SELECT COALESCE(duration_seconds, 0) + COALESCE(rest_time_seconds, 0) FROM weights_and_sets
 WHERE id = $1 AND workout_exercises_id = $2;
 
 -- name: GetTotalDurationForAllSets :one
-SELECT SUM(duration_seconds + rest_time_seconds) FROM weights_and_sets
+SELECT COALESCE(SUM(COALESCE(duration_seconds, 0) + COALESCE(rest_time_seconds, 0)), 0)::int4 FROM weights_and_sets
 WHERE workout_exercises_id = $1;
 
 -- name: DeleteWeightAndSets :exec

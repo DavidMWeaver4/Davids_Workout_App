@@ -38,13 +38,16 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot)))))
+	//
 	mux.HandleFunc("POST /api/v1/register", apiCfg.handlerRegister)
 	mux.HandleFunc("POST /api/v1/login", apiCfg.handlerLogin)
+	//
 	mux.HandleFunc("GET /api/v1/users", apiCfg.handlerUsers)
 	mux.HandleFunc("GET /api/v1/users/me", apiCfg.handlerGetMe)
 	mux.HandleFunc("PUT /api/v1/users/me/email", apiCfg.handlerChangeEmail)
 	mux.HandleFunc("PUT /api/v1/users/me/password", apiCfg.handlerChangePassword)
 	mux.HandleFunc("DELETE /api/v1/users/me", apiCfg.handlerDeleteMe)
+	//
 	mux.HandleFunc("POST /api/v1/workout_sessions", apiCfg.handlerCreateWorkoutSession)
 	mux.HandleFunc("GET /api/v1/workout_sessions/me", apiCfg.handlerGetAllMyWorkoutSessions)
 	mux.HandleFunc("GET /api/v1/workout_sessions/{id}", apiCfg.handlerGetWorkoutSessionById)
@@ -55,16 +58,23 @@ func main() {
 	mux.HandleFunc("GET /api/v1/workout_sessions/count/me", apiCfg.handlerCountSessions)
 	mux.HandleFunc("GET /api/v1/workout_sessions/search/desc", apiCfg.handlerSearchWOSByDescription)
 	mux.HandleFunc("GET /api/v1/workout_sessions/search/date", apiCfg.handlerSearchWOSByDateRange)
+	//
 	mux.HandleFunc("POST /api/v1/workout_exercises", apiCfg.handlerCreateWorkoutExercise)
 	mux.HandleFunc("GET /api/v1/workout_exercises/{id}", apiCfg.handlerGetWorkoutExercises)
 	mux.HandleFunc("GET /api/v1/workout_sessions/{session_id}/exercises", apiCfg.handlerGetWorkoutExercisesInSession)
 	mux.HandleFunc("DELETE /api/v1/workout_exercises/{id}", apiCfg.handlerDeleteWorkoutExercises)
 	mux.HandleFunc("GET /api/v1/workout_sessions/{session_id}/exercises/count", apiCfg.handlerGetNumOfWorkoutsInSession)
+	//
 	mux.HandleFunc("POST /api/v1/weights_and_sets", apiCfg.handlerCreateWeightsAndSets)
 	mux.HandleFunc("GET /api/v1/workout_exercises/{id}/sets", apiCfg.handlerGetAllSetsFromSession)
 	mux.HandleFunc("DELETE /api/v1/weights_and_sets/{id}", apiCfg.handlerDeleteWeightandSet)
 	mux.HandleFunc("PUT /api/v1/weights_and_sets/{id}", apiCfg.handlerUpdateWeightAndSets)
 	mux.HandleFunc("GET /api/v1/weights_and_sets/{id}/volume", apiCfg.handlerGetVolumeSet)
+	mux.HandleFunc("GET /api/v1/weights_and_sets/{id}/volume/all", apiCfg.handlerGetTotalVolumeFromAllSet)
+	mux.HandleFunc("GET /api/v1/weights_and_sets/{id}/duration", apiCfg.handlerGetTotalDuration)
+	mux.HandleFunc("GET /api/v1/weights_and_sets/{id}/duration/all", apiCfg.handlerGetTotalDurationFromAllSets)
+	//
+
 	myServer := http.Server{
 		Addr:    ":" + port,
 		Handler: mux,

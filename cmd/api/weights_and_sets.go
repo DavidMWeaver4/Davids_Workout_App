@@ -13,6 +13,14 @@ import (
 
 //TODO
 
+type volumeResponse struct {
+	Volume float64 `json:"volume"`
+}
+
+type durationResponse struct {
+	TotalSeconds int32 `json:"total_seconds"`
+}
+
 func (cfg *apiConfig) handlerCreateWeightsAndSets(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
@@ -60,19 +68,7 @@ func (cfg *apiConfig) handlerCreateWeightsAndSets(w http.ResponseWriter, r *http
 		respondWithError(w, http.StatusInternalServerError, "Error writing to database", err)
 		return
 	}
-	respondWithJSON(w, http.StatusCreated, weightAndSets{
-		ID:                 weightSet.ID,
-		WorkoutExercisesID: weightSet.WorkoutExercisesID,
-		Weight:             weightSet.Weight,
-		IsKilograms:        weightSet.IsKilograms,
-		SetNumber:          weightSet.SetNumber,
-		RepsTarget:         weightSet.RepsTarget,
-		RepsActual:         weightSet.RepsActual,
-		DurationSeconds:    nullInt32ToPtr(weightSet.DurationSeconds),
-		RestTimeSeconds:    nullInt32ToPtr(weightSet.RestTimeSeconds),
-		CreatedAt:          weightSet.CreatedAt,
-		UpdatedAt:          weightSet.UpdatedAt,
-	})
+	respondWithJSON(w, http.StatusCreated, weightSetResponse(weightSet))
 }
 
 func (cfg *apiConfig) handlerGetAllSetsFromSession(w http.ResponseWriter, r *http.Request) {
@@ -103,19 +99,7 @@ func (cfg *apiConfig) handlerGetAllSetsFromSession(w http.ResponseWriter, r *htt
 	}
 	response := make([]weightAndSets, 0)
 	for _, sis := range setsInSession {
-		response = append(response, weightAndSets{
-			ID:                 sis.ID,
-			WorkoutExercisesID: sis.WorkoutExercisesID,
-			Weight:             sis.Weight,
-			IsKilograms:        sis.IsKilograms,
-			SetNumber:          sis.SetNumber,
-			RepsTarget:         sis.RepsTarget,
-			RepsActual:         sis.RepsActual,
-			DurationSeconds:    nullInt32ToPtr(sis.DurationSeconds),
-			RestTimeSeconds:    nullInt32ToPtr(sis.RestTimeSeconds),
-			CreatedAt:          sis.CreatedAt,
-			UpdatedAt:          sis.UpdatedAt,
-		})
+		response = append(response, weightSetResponse(sis))
 	}
 	respondWithJSON(w, http.StatusOK, response)
 }
@@ -206,19 +190,7 @@ func (cfg *apiConfig) handlerUpdateWeightAndSets(w http.ResponseWriter, r *http.
 		respondWithError(w, http.StatusInternalServerError, "Failed to update database", err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, weightAndSets{
-		ID:                 updatedSet.ID,
-		WorkoutExercisesID: updatedSet.WorkoutExercisesID,
-		Weight:             updatedSet.Weight,
-		IsKilograms:        updatedSet.IsKilograms,
-		SetNumber:          updatedSet.SetNumber,
-		RepsTarget:         updatedSet.RepsTarget,
-		RepsActual:         updatedSet.RepsActual,
-		DurationSeconds:    nullInt32ToPtr(updatedSet.DurationSeconds),
-		RestTimeSeconds:    nullInt32ToPtr(updatedSet.RestTimeSeconds),
-		CreatedAt:          updatedSet.CreatedAt,
-		UpdatedAt:          updatedSet.UpdatedAt,
-	})
+	respondWithJSON(w, http.StatusOK, weightSetResponse(updatedSet))
 }
 
 func (cfg *apiConfig) handlerGetVolumeSet(w http.ResponseWriter, r *http.Request) {
@@ -228,10 +200,7 @@ func (cfg *apiConfig) handlerGetVolumeSet(w http.ResponseWriter, r *http.Request
 	}
 	idString := r.PathValue("id")
 	var weightSetID uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
+
 	weightSetID, err = uuid.Parse(idString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
@@ -247,14 +216,90 @@ func (cfg *apiConfig) handlerGetVolumeSet(w http.ResponseWriter, r *http.Request
 		WorkoutExercisesID: weightSet.WorkoutExercisesID,
 	})
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Set not found", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to get volume", err)
 		return
 	}
-	type volumeResponse struct {
-		Volume float64 `json:"volume"`
+	respondWithJSON(w, http.StatusOK, volumeResponse{Volume: float64(setVolume)})
+}
+func (cfg *apiConfig) handlerGetTotalVolumeFromAllSet(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	idString := r.PathValue("id")
+	var weightSetID uuid.UUID
+
+	weightSetID, err = uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
+		return
+	}
+	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		return
+	}
+	setVolume, err := cfg.db.GetTotalVolumeFromAllSets(r.Context(), weightSet.WorkoutExercisesID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get volume", err)
+		return
 	}
 
-	respondWithJSON(w, http.StatusOK, volumeResponse{Volume: float64(setVolume)})
+	respondWithJSON(w, http.StatusOK, volumeResponse{Volume: setVolume})
+}
+func (cfg *apiConfig) handlerGetTotalDuration(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	idString := r.PathValue("id")
+	var weightSetID uuid.UUID
+
+	weightSetID, err = uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
+		return
+	}
+	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		return
+	}
+	totalDuration, err := cfg.db.GetTotalDuration(r.Context(), database.GetTotalDurationParams{
+		ID:                 weightSetID,
+		WorkoutExercisesID: weightSet.WorkoutExercisesID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get duration", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, durationResponse{TotalSeconds: totalDuration})
+}
+
+func (cfg *apiConfig) handlerGetTotalDurationFromAllSets(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	idString := r.PathValue("id")
+	var weightSetID uuid.UUID
+
+	weightSetID, err = uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
+		return
+	}
+	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		return
+	}
+	totalDuration, err := cfg.db.GetTotalDurationForAllSets(r.Context(), weightSet.WorkoutExercisesID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get duration", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, durationResponse{TotalSeconds: totalDuration})
 }
 
 // Helper functions
@@ -276,6 +321,7 @@ func (cfg *apiConfig) authorizeWorkoutExercise(ctx context.Context, workoutExerc
 
 	return workExercise, nil
 }
+
 func (cfg *apiConfig) authorizeWeightSet(ctx context.Context, weightSetID uuid.UUID, userID uuid.UUID) (database.WeightsAndSet, error) {
 
 	weightSet, err := cfg.db.GetWeightAndSetFromID(ctx, weightSetID)
@@ -289,6 +335,22 @@ func (cfg *apiConfig) authorizeWeightSet(ctx context.Context, weightSetID uuid.U
 	}
 
 	return weightSet, nil
+}
+
+func weightSetResponse(ws database.WeightsAndSet) weightAndSets {
+	return weightAndSets{
+		ID:                 ws.ID,
+		WorkoutExercisesID: ws.WorkoutExercisesID,
+		Weight:             ws.Weight,
+		IsKilograms:        ws.IsKilograms,
+		SetNumber:          ws.SetNumber,
+		RepsTarget:         ws.RepsTarget,
+		RepsActual:         ws.RepsActual,
+		DurationSeconds:    nullInt32ToPtr(ws.DurationSeconds),
+		RestTimeSeconds:    nullInt32ToPtr(ws.RestTimeSeconds),
+		CreatedAt:          ws.CreatedAt,
+		UpdatedAt:          ws.UpdatedAt,
+	}
 }
 
 //TODO

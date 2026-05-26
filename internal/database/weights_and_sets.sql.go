@@ -132,7 +132,7 @@ func (q *Queries) GetAllSetsFromSession(ctx context.Context, workoutExercisesID 
 }
 
 const getSetVolume = `-- name: GetSetVolume :one
-SELECT reps_actual * weight FROM weights_and_sets
+SELECT (reps_actual * weight)::float8 FROM weights_and_sets
 WHERE id = $1 AND workout_exercises_id = $2
 `
 
@@ -141,15 +141,15 @@ type GetSetVolumeParams struct {
 	WorkoutExercisesID uuid.UUID
 }
 
-func (q *Queries) GetSetVolume(ctx context.Context, arg GetSetVolumeParams) (int32, error) {
+func (q *Queries) GetSetVolume(ctx context.Context, arg GetSetVolumeParams) (float64, error) {
 	row := q.db.QueryRowContext(ctx, getSetVolume, arg.ID, arg.WorkoutExercisesID)
-	var column_1 int32
+	var column_1 float64
 	err := row.Scan(&column_1)
 	return column_1, err
 }
 
 const getTotalDuration = `-- name: GetTotalDuration :one
-SELECT duration_seconds + rest_time_seconds FROM weights_and_sets
+SELECT COALESCE(duration_seconds, 0) + COALESCE(rest_time_seconds, 0) FROM weights_and_sets
 WHERE id = $1 AND workout_exercises_id = $2
 `
 
@@ -166,27 +166,27 @@ func (q *Queries) GetTotalDuration(ctx context.Context, arg GetTotalDurationPara
 }
 
 const getTotalDurationForAllSets = `-- name: GetTotalDurationForAllSets :one
-SELECT SUM(duration_seconds + rest_time_seconds) FROM weights_and_sets
+SELECT COALESCE(SUM(COALESCE(duration_seconds, 0) + COALESCE(rest_time_seconds, 0)), 0)::int4 FROM weights_and_sets
 WHERE workout_exercises_id = $1
 `
 
-func (q *Queries) GetTotalDurationForAllSets(ctx context.Context, workoutExercisesID uuid.UUID) (int64, error) {
+func (q *Queries) GetTotalDurationForAllSets(ctx context.Context, workoutExercisesID uuid.UUID) (int32, error) {
 	row := q.db.QueryRowContext(ctx, getTotalDurationForAllSets, workoutExercisesID)
-	var sum int64
-	err := row.Scan(&sum)
-	return sum, err
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const getTotalVolumeFromAllSets = `-- name: GetTotalVolumeFromAllSets :one
-SELECT SUM(reps_actual * weight) FROM weights_and_sets
+SELECT COALESCE(SUM(reps_actual * weight), 0)::float8 FROM weights_and_sets
 WHERE workout_exercises_id = $1
 `
 
-func (q *Queries) GetTotalVolumeFromAllSets(ctx context.Context, workoutExercisesID uuid.UUID) (int64, error) {
+func (q *Queries) GetTotalVolumeFromAllSets(ctx context.Context, workoutExercisesID uuid.UUID) (float64, error) {
 	row := q.db.QueryRowContext(ctx, getTotalVolumeFromAllSets, workoutExercisesID)
-	var sum int64
-	err := row.Scan(&sum)
-	return sum, err
+	var column_1 float64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const getWeightAndSetFromID = `-- name: GetWeightAndSetFromID :one
