@@ -68,3 +68,10 @@ func nullInt32ToPtr(v sql.NullInt32) *int32 {
 	}
 	return nil
 }
+
+func nullFloat64ToPtr(v sql.NullFloat64) *float64 {
+	if v.Valid {
+		return &v.Float64
+	}
+	return nil
+}

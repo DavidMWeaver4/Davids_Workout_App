@@ -40,7 +40,8 @@ make run         # start the API
 ```
 
 ## Usage
-A few simple commands to test.
+A few simple commands to test. 
+>Emails are unqiue so please change if these do not work.
 
 ```bash
 # register
@@ -95,8 +96,7 @@ go test ./...
 If you'd like to contribute, please fork the repository and open a pull request to the `main` branch.
 
 ## TODO
-- [ ] List exercise handlers
-- [ ] Weights and sets handlers
+- [x] Weights and sets handlers
 - [ ] Cardio handlers
 - [ ] Unit tests
 - [ ] CI/CD pipeline

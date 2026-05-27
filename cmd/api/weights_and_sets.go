@@ -302,7 +302,11 @@ func (cfg *apiConfig) handlerGetTotalDurationFromAllSets(w http.ResponseWriter, 
 	respondWithJSON(w, http.StatusOK, durationResponse{TotalSeconds: totalDuration})
 }
 
+/*
+*
 // Helper functions
+*
+*/
 func (cfg *apiConfig) authorizeWorkoutExercise(ctx context.Context, workoutExerciseID uuid.UUID, userID uuid.UUID) (database.WorkoutExercise, error) {
 
 	workExercise, err := cfg.db.GetWorkoutExerciseFromID(ctx, workoutExerciseID)
@@ -352,7 +356,3 @@ func weightSetResponse(ws database.WeightsAndSet) weightAndSets {
 		UpdatedAt:          ws.UpdatedAt,
 	}
 }
-
-//TODO
-// GetTotalVolumeFromAllSets
-// GetTotalDurationFromAllSets

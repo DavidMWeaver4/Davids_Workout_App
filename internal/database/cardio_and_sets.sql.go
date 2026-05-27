@@ -32,7 +32,7 @@ type CreateCardioAndSetsParams struct {
 	ID                 uuid.UUID
 	WorkoutExercisesID uuid.UUID
 	SetNumber          int32
-	Distance           sql.NullString
+	Distance           sql.NullFloat64
 	IsKilometers       bool
 	DurationSeconds    sql.NullInt32
 	CreatedAt          time.Time
@@ -171,9 +171,9 @@ type GetSetDistanceParams struct {
 	WorkoutExercisesID uuid.UUID
 }
 
-func (q *Queries) GetSetDistance(ctx context.Context, arg GetSetDistanceParams) (sql.NullString, error) {
+func (q *Queries) GetSetDistance(ctx context.Context, arg GetSetDistanceParams) (sql.NullFloat64, error) {
 	row := q.db.QueryRowContext(ctx, getSetDistance, arg.ID, arg.WorkoutExercisesID)
-	var distance sql.NullString
+	var distance sql.NullFloat64
 	err := row.Scan(&distance)
 	return distance, err
 }
@@ -209,7 +209,7 @@ RETURNING id, workout_exercises_id, set_number, distance, is_kilometers, duratio
 
 type UpdateCardioAndSetsParams struct {
 	SetNumber          int32
-	Distance           sql.NullString
+	Distance           sql.NullFloat64
 	IsKilometers       bool
 	DurationSeconds    sql.NullInt32
 	ID                 uuid.UUID

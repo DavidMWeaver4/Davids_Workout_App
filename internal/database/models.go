@@ -15,7 +15,7 @@ type CardioAndSet struct {
 	ID                 uuid.UUID
 	WorkoutExercisesID uuid.UUID
 	SetNumber          int32
-	Distance           sql.NullString
+	Distance           sql.NullFloat64
 	IsKilometers       bool
 	DurationSeconds    sql.NullInt32
 	CreatedAt          time.Time
