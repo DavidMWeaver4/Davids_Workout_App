@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -9,7 +10,13 @@ import (
 	"github.com/google/uuid"
 )
 
-//TODO
+// TODO
+type distanceResponse struct {
+	Distance float64 `json:"distance"`
+}
+type durationint64Response struct {
+	TotalSeconds int64 `json:"total_seconds"`
+}
 
 func (cfg *apiConfig) handlerCreateCardioAndSets(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
@@ -63,10 +70,7 @@ func (cfg *apiConfig) handlerGetAllCardioFromSession(w http.ResponseWriter, r *h
 	}
 	idString := r.PathValue("id")
 	var workoutExerciseID uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
+
 	workoutExerciseID, err = uuid.Parse(idString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
@@ -94,24 +98,20 @@ func (cfg *apiConfig) handlerDeleteCardioAndSets(w http.ResponseWriter, r *http.
 		return
 	}
 	idString := r.PathValue("id")
-	var weightSetID uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
-	weightSetID, err = uuid.Parse(idString)
+	var cardioSetID uuid.UUID
+	cardioSetID, err = uuid.Parse(idString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
 		return
 	}
-	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
+	cardioSet, err := cfg.authorizeCardioSet(r.Context(), cardioSetID, userID)
 	if err != nil {
 		respondWithError(w, http.StatusForbidden, "Forbidden", err)
 		return
 	}
 	err = cfg.db.DeleteCardioAndSets(r.Context(), database.DeleteCardioAndSetsParams{
-		ID:                 weightSet.ID,
-		WorkoutExercisesID: weightSet.WorkoutExercisesID,
+		ID:                 cardioSet.ID,
+		WorkoutExercisesID: cardioSet.WorkoutExercisesID,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error deleting from database", err)
@@ -145,7 +145,7 @@ func (cfg *apiConfig) handlerUpdateCardioAndSets(w http.ResponseWriter, r *http.
 		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
 		return
 	}
-	weightSet, err := cfg.authorizeWeightSet(r.Context(), setID, userID)
+	cardioSet, err := cfg.authorizeCardioSet(r.Context(), setID, userID)
 	if err != nil {
 		respondWithError(w, http.StatusForbidden, "Forbidden", err)
 		return
@@ -162,7 +162,7 @@ func (cfg *apiConfig) handlerUpdateCardioAndSets(w http.ResponseWriter, r *http.
 			Valid: params.DurationSeconds != 0,
 		},
 		ID:                 setID,
-		WorkoutExercisesID: weightSet.WorkoutExercisesID,
+		WorkoutExercisesID: cardioSet.WorkoutExercisesID,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to update database", err)
@@ -171,17 +171,135 @@ func (cfg *apiConfig) handlerUpdateCardioAndSets(w http.ResponseWriter, r *http.
 	respondWithJSON(w, http.StatusOK, cardioSetResponse(updatedSet))
 }
 
-//TODO
-// handlerGetAllSetsDistance
-// handlerGetAllSetsDuration
-// handlerGetCardioAndSetFromID
-// handlerGetSetDistance
-// handlerGetSetDuration
+// TODO
+func (cfg *apiConfig) handlerGetSetDistance(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	idString := r.PathValue("id")
+	var cardioSetID uuid.UUID
+
+	cardioSetID, err = uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
+		return
+	}
+	cardioSet, err := cfg.authorizeCardioSet(r.Context(), cardioSetID, userID)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		return
+	}
+	setDistance, err := cfg.db.GetSetDistance(r.Context(), database.GetSetDistanceParams{
+		ID:                 cardioSet.ID,
+		WorkoutExercisesID: cardioSet.WorkoutExercisesID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get distance", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, distanceResponse{Distance: setDistance.Float64})
+
+}
+func (cfg *apiConfig) handlerGetAllSetsDistance(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	idString := r.PathValue("id")
+	var cardioSetID uuid.UUID
+
+	cardioSetID, err = uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
+		return
+	}
+	cardioSet, err := cfg.authorizeCardioSet(r.Context(), cardioSetID, userID)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		return
+	}
+	setDistance, err := cfg.db.GetAllSetsDistance(r.Context(), cardioSet.WorkoutExercisesID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get distance", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, distanceResponse{Distance: float64(setDistance)})
+
+}
+func (cfg *apiConfig) handlerGetSetDuration(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	cardioSetID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
+		return
+	}
+	cardioSet, err := cfg.authorizeCardioSet(r.Context(), cardioSetID, userID)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		return
+	}
+	duration, err := cfg.db.GetSetDuration(r.Context(), database.GetSetDurationParams{
+		ID:                 cardioSet.ID,
+		WorkoutExercisesID: cardioSet.WorkoutExercisesID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get duration", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, durationint64Response{TotalSeconds: int64(duration.Int32)})
+}
+
+func (cfg *apiConfig) handlerGetAllSetsDuration(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	idString := r.PathValue("id")
+	var cardioSetID uuid.UUID
+
+	cardioSetID, err = uuid.Parse(idString)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
+		return
+	}
+	cardioSet, err := cfg.authorizeCardioSet(r.Context(), cardioSetID, userID)
+	if err != nil {
+		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		return
+	}
+	totalDuration, err := cfg.db.GetAllSetsDuration(r.Context(), cardioSet.WorkoutExercisesID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get duration", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, durationint64Response{TotalSeconds: totalDuration})
+}
+
 /*
 *
 // Helper functions
 *
 */
+
+func (cfg *apiConfig) authorizeCardioSet(ctx context.Context, cardioSetID uuid.UUID, userID uuid.UUID) (database.CardioAndSet, error) {
+
+	cardioSet, err := cfg.db.GetCardioAndSetFromID(ctx, cardioSetID)
+	if err != nil {
+		return database.CardioAndSet{}, err
+	}
+
+	_, err = cfg.authorizeWorkoutExercise(ctx, cardioSet.WorkoutExercisesID, userID)
+	if err != nil {
+		return database.CardioAndSet{}, err
+	}
+
+	return cardioSet, nil
+}
+
 func cardioSetResponse(ws database.CardioAndSet) cardioAndSets {
 	return cardioAndSets{
 		ID:                 ws.ID,

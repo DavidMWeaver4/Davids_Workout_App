@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
@@ -307,25 +306,6 @@ func (cfg *apiConfig) handlerGetTotalDurationFromAllSets(w http.ResponseWriter, 
 // Helper functions
 *
 */
-func (cfg *apiConfig) authorizeWorkoutExercise(ctx context.Context, workoutExerciseID uuid.UUID, userID uuid.UUID) (database.WorkoutExercise, error) {
-
-	workExercise, err := cfg.db.GetWorkoutExerciseFromID(ctx, workoutExerciseID)
-	if err != nil {
-		return database.WorkoutExercise{}, err
-	}
-
-	workSess, err := cfg.db.GetWorkoutSessionByID(ctx, workExercise.WorkoutSessionID)
-	if err != nil {
-		return database.WorkoutExercise{}, err
-	}
-
-	if workSess.UserID != userID {
-		return database.WorkoutExercise{}, errors.New("forbidden")
-	}
-
-	return workExercise, nil
-}
-
 func (cfg *apiConfig) authorizeWeightSet(ctx context.Context, weightSetID uuid.UUID, userID uuid.UUID) (database.WeightsAndSet, error) {
 
 	weightSet, err := cfg.db.GetWeightAndSetFromID(ctx, weightSetID)
