@@ -47,12 +47,12 @@ A few simple commands to test.
 # register
 curl -X POST http://localhost:8080/api/v1/register \
   -H "Content-Type: application/json" \
-  -d '{"email": "test2@test.com", "password": "password123"}'
+  -d '{"email": "test@test.com", "password": "password123"}'
 
 # login
 curl -X POST http://localhost:8080/api/v1/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "test2@test.com", "password": "password123"}'
+  -d '{"email": "test@test.com", "password": "password123"}'
 
 # authenticated request
 curl -X GET http://localhost:8080/api/v1/users/me \

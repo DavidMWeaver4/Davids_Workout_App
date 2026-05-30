@@ -57,6 +57,7 @@ func (cfg *apiConfig) handlerGetAllMyWorkoutSessions(w http.ResponseWriter, r *h
 	}
 	var workSess []database.WorkoutSession
 	workSess, err = cfg.db.GetAllWorkoutSessionsSorted(r.Context(), userID)
+
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve workout session", err)
 		return
@@ -78,16 +79,16 @@ func (cfg *apiConfig) handlerGetWorkoutSessionById(w http.ResponseWriter, r *htt
 	}
 	idString := r.PathValue("id")
 	var ID uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
 	ID, err = uuid.Parse(idString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
 		return
 	}
 	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), ID)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Not found", nil)
+		return
+	}
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve workout session", err)
 		return
@@ -123,6 +124,10 @@ func (cfg *apiConfig) handlerUpdateWorkoutSession(w http.ResponseWriter, r *http
 	}
 
 	checkSession, err := cfg.db.GetWorkoutSessionByID(r.Context(), ID)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Session not found", nil)
+		return
+	}
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't check database", err)
 		return
@@ -181,8 +186,12 @@ func (cfg *apiConfig) handlerGetMyLastSession(w http.ResponseWriter, r *http.Req
 		return
 	}
 	workSess, err := cfg.db.GetLastWorkoutSession(r.Context(), userID)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Not found", nil)
+		return
+	}
 	if err != nil {
-		respondWithError(w, http.StatusNotFound, "No sessions found", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve records", err)
 		return
 	}
 	respondWithJSON(w, http.StatusOK, dbSessionToResponse(workSess))
@@ -194,6 +203,11 @@ func (cfg *apiConfig) handlerGetMyXNumberLastSessions(w http.ResponseWriter, r *
 		return
 	}
 	lastXString := r.URL.Query().Get("lastx")
+	if lastXString == "" {
+		respondWithError(w, http.StatusBadRequest, "Missing required query param: lastx", nil)
+		return
+	}
+
 	var lastX int
 	lastX, err = strconv.Atoi(lastXString)
 	if err != nil {

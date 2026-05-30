@@ -29,6 +29,10 @@ func (cfg *apiConfig) handlerCreateWorkoutExercise(w http.ResponseWriter, r *htt
 		return
 	}
 	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), params.WorkoutSessionID)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Session not found", nil)
+		return
+	}
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve workout session", err)
 		return
@@ -42,6 +46,10 @@ func (cfg *apiConfig) handlerCreateWorkoutExercise(w http.ResponseWriter, r *htt
 		return
 	}
 	exercise, err := cfg.db.GetExerciseFromName(r.Context(), params.ExerciseName)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Exercise not found", nil)
+		return
+	}
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Cannot find exercise", err)
 		return
@@ -61,15 +69,7 @@ func (cfg *apiConfig) handlerCreateWorkoutExercise(w http.ResponseWriter, r *htt
 		respondWithError(w, http.StatusInternalServerError, "Error storing to database", err)
 		return
 	}
-	respondWithJSON(w, http.StatusCreated, workoutExercise{
-		ID:               workExer.ID,
-		WorkoutSessionID: workExer.WorkoutSessionID,
-		ExerciseID:       workExer.ExerciseID,
-		OrderIndex:       workExer.OrderIndex,
-		Notes:            nullStringToPtr(workExer.Notes),
-		CreatedAt:        workExer.CreatedAt,
-		UpdatedAt:        workExer.UpdatedAt,
-	})
+	respondWithJSON(w, http.StatusCreated, dbExerciseToResponse(workExer))
 }
 
 func (cfg *apiConfig) handlerGetWorkoutExercises(w http.ResponseWriter, r *http.Request) {
@@ -79,23 +79,28 @@ func (cfg *apiConfig) handlerGetWorkoutExercises(w http.ResponseWriter, r *http.
 	}
 	idString := r.PathValue("id")
 	var execID uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
+
 	execID, err = uuid.Parse(idString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
 		return
 	}
 	exercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), execID)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Exercise not found", nil)
+		return
+	}
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
 		return
 	}
 	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), exercise.WorkoutSessionID)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Session not found", nil)
+		return
+	}
 	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found", err)
+		respondWithError(w, http.StatusNotFound, "Exercise not found", err)
 		return
 	}
 	if workSess.UserID != userID {
@@ -103,15 +108,7 @@ func (cfg *apiConfig) handlerGetWorkoutExercises(w http.ResponseWriter, r *http.
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, workoutExercise{
-		ID:               exercise.ID,
-		WorkoutSessionID: exercise.WorkoutSessionID,
-		ExerciseID:       exercise.ExerciseID,
-		OrderIndex:       exercise.OrderIndex,
-		Notes:            nullStringToPtr(exercise.Notes),
-		CreatedAt:        exercise.CreatedAt,
-		UpdatedAt:        exercise.UpdatedAt,
-	})
+	respondWithJSON(w, http.StatusOK, dbExerciseToResponse(exercise))
 
 }
 func (cfg *apiConfig) handlerGetWorkoutExercisesInSession(w http.ResponseWriter, r *http.Request) {
@@ -121,18 +118,19 @@ func (cfg *apiConfig) handlerGetWorkoutExercisesInSession(w http.ResponseWriter,
 	}
 	idString := r.PathValue("id")
 	var exeSessID uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
+
 	exeSessID, err = uuid.Parse(idString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
 		return
 	}
 	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), exeSessID)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Exercise not found", nil)
+		return
+	}
 	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found", err)
+		respondWithError(w, http.StatusNotFound, "Exercise not found", err)
 		return
 	}
 	if workSess.UserID != userID {
@@ -147,15 +145,7 @@ func (cfg *apiConfig) handlerGetWorkoutExercisesInSession(w http.ResponseWriter,
 	}
 	response := make([]workoutExercise, 0)
 	for _, ws := range sessionExercises {
-		response = append(response, workoutExercise{
-			ID:               ws.ID,
-			WorkoutSessionID: ws.WorkoutSessionID,
-			ExerciseID:       ws.ExerciseID,
-			OrderIndex:       ws.OrderIndex,
-			Notes:            nullStringToPtr(ws.Notes),
-			CreatedAt:        ws.CreatedAt,
-			UpdatedAt:        ws.UpdatedAt,
-		})
+		response = append(response, dbExerciseToResponse(ws))
 	}
 	respondWithJSON(w, http.StatusOK, response)
 
@@ -168,24 +158,29 @@ func (cfg *apiConfig) handlerDeleteWorkoutExercises(w http.ResponseWriter, r *ht
 	}
 	idString := r.PathValue("id")
 	var workoutExercise uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
+
 	workoutExercise, err = uuid.Parse(idString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
 		return
 	}
 	exercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), workoutExercise)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Exercise not found", nil)
+		return
+	}
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
 		return
 	}
 	workoutSession := exercise.WorkoutSessionID
 	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workoutSession)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Session not found", nil)
+		return
+	}
 	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found", err)
+		respondWithError(w, http.StatusNotFound, "Exercise not found", err)
 		return
 	}
 	if workSess.UserID != userID {
@@ -210,16 +205,17 @@ func (cfg *apiConfig) handlerGetNumOfWorkoutsInSession(w http.ResponseWriter, r 
 	}
 	idString := r.PathValue("id")
 	var workoutSession uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
+
 	workoutSession, err = uuid.Parse(idString)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
 		return
 	}
 	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workoutSession)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Session not found", nil)
+		return
+	}
 	if err != nil {
 		respondWithError(w, http.StatusNotFound, "Session not found", err)
 		return
@@ -228,19 +224,29 @@ func (cfg *apiConfig) handlerGetNumOfWorkoutsInSession(w http.ResponseWriter, r 
 		respondWithError(w, http.StatusForbidden, "Not your exercise session", nil)
 		return
 	}
-	var workExer []database.WorkoutExercise
-	workExer, err = cfg.db.GetWorkoutsInSession(r.Context(), workoutSession)
+	count, err := cfg.db.GetNumberOfExercisesInWorkout(r.Context(), workoutSession)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not retrieve from database", err)
 		return
 	}
 	type countResponse struct {
-		Count int `json:"count"`
+		Count int64 `json:"count"`
 	}
-	respondWithJSON(w, http.StatusOK, countResponse{Count: len(workExer)})
+	respondWithJSON(w, http.StatusOK, countResponse{Count: count})
 }
 
 /*
- * updateeworkoutexerciseorder
+ * helpers
  *
  */
+func dbExerciseToResponse(we database.WorkoutExercise) workoutExercise {
+	return workoutExercise{
+		ID:               we.ID,
+		WorkoutSessionID: we.WorkoutSessionID,
+		ExerciseID:       we.ExerciseID,
+		OrderIndex:       we.OrderIndex,
+		Notes:            nullStringToPtr(we.Notes),
+		CreatedAt:        we.CreatedAt,
+		UpdatedAt:        we.UpdatedAt,
+	}
+}

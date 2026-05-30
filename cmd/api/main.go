@@ -54,7 +54,7 @@ func main() {
 	mux.HandleFunc("PUT /api/v1/workout_sessions/{id}", apiCfg.handlerUpdateWorkoutSession)
 	mux.HandleFunc("DELETE /api/v1/workout_sessions/{id}", apiCfg.handlerDeleteWorkoutSession)
 	mux.HandleFunc("GET /api/v1/workout_sessions/last/me", apiCfg.handlerGetMyLastSession)
-	mux.HandleFunc("GET /api/v1/workout_sessions/getX/me", apiCfg.handlerGetMyXNumberLastSessions)
+	mux.HandleFunc("GET /api/v1/workout_sessions/last/{lastX}", apiCfg.handlerGetMyXNumberLastSessions)
 	mux.HandleFunc("GET /api/v1/workout_sessions/count/me", apiCfg.handlerCountSessions)
 	mux.HandleFunc("GET /api/v1/workout_sessions/search/desc", apiCfg.handlerSearchWOSByDescription)
 	mux.HandleFunc("GET /api/v1/workout_sessions/search/date", apiCfg.handlerSearchWOSByDateRange)
@@ -85,7 +85,7 @@ func main() {
 
 	myServer := http.Server{
 		Addr:    ":" + port,
-		Handler: mux,
+		Handler: middlewareLogger(mux),
 	}
 	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 	log.Fatal(myServer.ListenAndServe())
