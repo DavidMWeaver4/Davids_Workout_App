@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -19,7 +20,17 @@ func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 	}
 	respondWithJSON(w, code, map[string]string{"error": msg})
 }
-
+func respondWithAuthError(w http.ResponseWriter, err error) {
+	if errors.Is(err, ErrNotFound) {
+		respondWithError(w, http.StatusNotFound, "Resource not found", nil)
+		return
+	}
+	if errors.Is(err, ErrForbidden) {
+		respondWithError(w, http.StatusForbidden, "Access denied", nil)
+		return
+	}
+	respondWithError(w, http.StatusInternalServerError, "Authorization failed", err)
+}
 func respondWithJSON(w http.ResponseWriter, code int, payload any) {
 	dat, err := json.Marshal(payload)
 	if err != nil {

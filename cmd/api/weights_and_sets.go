@@ -1,16 +1,14 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
 	"github.com/google/uuid"
 )
-
-//TODO
 
 type volumeResponse struct {
 	Volume float64 `json:"volume"`
@@ -39,12 +37,17 @@ func (cfg *apiConfig) handlerCreateWeightsAndSets(w http.ResponseWriter, r *http
 	var params parameters
 	err = decoder.Decode(&params)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error decoding JSON", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
 	_, err = cfg.authorizeWorkoutExercise(r.Context(), params.WorkoutExercisesID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		respondWithAuthError(w, err)
+		return
+	}
+	err = validateWeightSet(params.Weight, params.SetNumber, params.RepsTarget, params.RepsActual, params.DurationSeconds, params.RestTimeSeconds)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 	weightSet, err := cfg.db.CreateWeightsAndSets(r.Context(), database.CreateWeightsAndSetsParams{
@@ -75,20 +78,14 @@ func (cfg *apiConfig) handlerGetAllSetsFromSession(w http.ResponseWriter, r *htt
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var workoutExerciseID uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
-	workoutExerciseID, err = uuid.Parse(idString)
+	workoutExerciseID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
 		return
 	}
 	_, err = cfg.authorizeWorkoutExercise(r.Context(), workoutExerciseID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		respondWithAuthError(w, err)
 		return
 	}
 	setsInSession, err := cfg.db.GetAllSetsFromSession(r.Context(), workoutExerciseID)
@@ -108,20 +105,15 @@ func (cfg *apiConfig) handlerDeleteWeightandSet(w http.ResponseWriter, r *http.R
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var weightSetID uuid.UUID
-	if idString == "" {
-		respondWithError(w, http.StatusBadRequest, "No ID provided", nil)
-		return
-	}
-	weightSetID, err = uuid.Parse(idString)
+	weightSetID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
 		return
 	}
+
 	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		respondWithAuthError(w, err)
 		return
 	}
 	err = cfg.db.DeleteWeightAndSets(r.Context(), database.DeleteWeightAndSetsParams{
@@ -141,31 +133,35 @@ func (cfg *apiConfig) handlerUpdateWeightAndSets(w http.ResponseWriter, r *http.
 		return
 	}
 	type parameters struct {
-		WorkoutExercisesID uuid.UUID `json:"workout_exercises_id"`
-		Weight             float64   `json:"weight"`
-		IsKilograms        bool      `json:"is_kilogram"`
-		SetNumber          int32     `json:"set_number"`
-		RepsTarget         int32     `json:"reps_target"`
-		RepsActual         int32     `json:"reps_actual"`
-		DurationSeconds    int32     `json:"duration_seconds"`
-		RestTimeSeconds    int32     `json:"rest_time_seconds"`
+		Weight          float64 `json:"weight"`
+		IsKilograms     bool    `json:"is_kilogram"`
+		SetNumber       int32   `json:"set_number"`
+		RepsTarget      int32   `json:"reps_target"`
+		RepsActual      int32   `json:"reps_actual"`
+		DurationSeconds int32   `json:"duration_seconds"`
+		RestTimeSeconds int32   `json:"rest_time_seconds"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	var params parameters
 	err = decoder.Decode(&params)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error decoding JSON", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
-	idString := r.PathValue("id")
-	setID, err := uuid.Parse(idString)
+	setID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
 		return
 	}
+
 	weightSet, err := cfg.authorizeWeightSet(r.Context(), setID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		respondWithAuthError(w, err)
+		return
+	}
+	err = validateWeightSet(params.Weight, params.SetNumber, params.RepsTarget, params.RepsActual, params.DurationSeconds, params.RestTimeSeconds)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
 	updatedSet, err := cfg.db.UpdateWeightsAndSets(r.Context(), database.UpdateWeightsAndSetsParams{
@@ -197,17 +193,14 @@ func (cfg *apiConfig) handlerGetVolumeSet(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var weightSetID uuid.UUID
-
-	weightSetID, err = uuid.Parse(idString)
+	weightSetID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
 		return
 	}
 	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		respondWithAuthError(w, err)
 		return
 	}
 	setVolume, err := cfg.db.GetSetVolume(r.Context(), database.GetSetVolumeParams{
@@ -225,17 +218,14 @@ func (cfg *apiConfig) handlerGetTotalVolumeFromAllSet(w http.ResponseWriter, r *
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var weightSetID uuid.UUID
-
-	weightSetID, err = uuid.Parse(idString)
+	weightSetID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
 		return
 	}
 	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		respondWithAuthError(w, err)
 		return
 	}
 	setVolume, err := cfg.db.GetTotalVolumeFromAllSets(r.Context(), weightSet.WorkoutExercisesID)
@@ -251,17 +241,14 @@ func (cfg *apiConfig) handlerGetTotalDuration(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var weightSetID uuid.UUID
-
-	weightSetID, err = uuid.Parse(idString)
+	weightSetID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
 		return
 	}
 	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		respondWithAuthError(w, err)
 		return
 	}
 	totalDuration, err := cfg.db.GetTotalDuration(r.Context(), database.GetTotalDurationParams{
@@ -280,17 +267,14 @@ func (cfg *apiConfig) handlerGetTotalDurationFromAllSets(w http.ResponseWriter, 
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var weightSetID uuid.UUID
-
-	weightSetID, err = uuid.Parse(idString)
+	weightSetID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
 		return
 	}
 	weightSet, err := cfg.authorizeWeightSet(r.Context(), weightSetID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusForbidden, "Forbidden", err)
+		respondWithAuthError(w, err)
 		return
 	}
 	totalDuration, err := cfg.db.GetTotalDurationForAllSets(r.Context(), weightSet.WorkoutExercisesID)
@@ -306,20 +290,6 @@ func (cfg *apiConfig) handlerGetTotalDurationFromAllSets(w http.ResponseWriter, 
 // Helper functions
 *
 */
-func (cfg *apiConfig) authorizeWeightSet(ctx context.Context, weightSetID uuid.UUID, userID uuid.UUID) (database.WeightsAndSet, error) {
-
-	weightSet, err := cfg.db.GetWeightAndSetFromID(ctx, weightSetID)
-	if err != nil {
-		return database.WeightsAndSet{}, err
-	}
-
-	_, err = cfg.authorizeWorkoutExercise(ctx, weightSet.WorkoutExercisesID, userID)
-	if err != nil {
-		return database.WeightsAndSet{}, err
-	}
-
-	return weightSet, nil
-}
 
 func weightSetResponse(ws database.WeightsAndSet) weightAndSets {
 	return weightAndSets{
@@ -335,4 +305,32 @@ func weightSetResponse(ws database.WeightsAndSet) weightAndSets {
 		CreatedAt:          ws.CreatedAt,
 		UpdatedAt:          ws.UpdatedAt,
 	}
+}
+func validateWeightSet(weight float64, setNumber int32, repsTarget int32, repsActual int32, durationSeconds int32, restTimeSeconds int32) error {
+
+	if weight < 0 {
+		return errors.New("weight cannot be negative")
+	}
+
+	if setNumber < 1 {
+		return errors.New("set_number must be greater than 0")
+	}
+
+	if repsTarget < 0 {
+		return errors.New("reps_target cannot be negative")
+	}
+
+	if repsActual < 0 {
+		return errors.New("reps_actual cannot be negative")
+	}
+
+	if durationSeconds < 0 {
+		return errors.New("duration_seconds cannot be negative")
+	}
+
+	if restTimeSeconds < 0 {
+		return errors.New("rest_time_seconds cannot be negative")
+	}
+
+	return nil
 }

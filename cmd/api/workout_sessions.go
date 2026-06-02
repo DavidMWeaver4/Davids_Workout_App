@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
@@ -25,7 +26,7 @@ func (cfg *apiConfig) handlerCreateWorkoutSession(w http.ResponseWriter, r *http
 	var params parameters
 	err = decoder.Decode(&params)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error decoding JSON", err)
+		respondWithError(w, http.StatusBadRequest, "invalid request body", err)
 		return
 	}
 	workoutSession, err := cfg.db.CreateWorkoutSessions(r.Context(), database.CreateWorkoutSessionsParams{
@@ -77,24 +78,14 @@ func (cfg *apiConfig) handlerGetWorkoutSessionById(w http.ResponseWriter, r *htt
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var ID uuid.UUID
-	ID, err = uuid.Parse(idString)
+	ID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
 		return
 	}
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), ID)
-	if err == sql.ErrNoRows {
-		respondWithError(w, http.StatusNotFound, "Not found", nil)
-		return
-	}
+	workSess, err := cfg.authorizeWorkoutSession(r.Context(), ID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve workout session", err)
-		return
-	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your session", nil)
+		respondWithAuthError(w, err)
 		return
 	}
 	respondWithJSON(w, http.StatusOK, dbSessionToResponse(workSess))
@@ -116,24 +107,15 @@ func (cfg *apiConfig) handlerUpdateWorkoutSession(w http.ResponseWriter, r *http
 		respondWithError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
-	idString := r.PathValue("id")
-	ID, err := uuid.Parse(idString)
+	ID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
 		return
 	}
 
-	checkSession, err := cfg.db.GetWorkoutSessionByID(r.Context(), ID)
-	if err == sql.ErrNoRows {
-		respondWithError(w, http.StatusNotFound, "Session not found", nil)
-		return
-	}
+	_, err = cfg.authorizeWorkoutSession(r.Context(), ID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't check database", err)
-		return
-	}
-	if checkSession.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "This sessions does not belong to you", nil)
+		respondWithAuthError(w, err)
 		return
 	}
 	err = cfg.db.UpdateWorkoutSession(r.Context(), database.UpdateWorkoutSessionParams{
@@ -162,11 +144,14 @@ func (cfg *apiConfig) handlerDeleteWorkoutSession(w http.ResponseWriter, r *http
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var iD uuid.UUID
-	iD, err = uuid.Parse(idString)
+	iD, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		return
+	}
+	_, err = cfg.authorizeWorkoutSession(r.Context(), iD, userID)
+	if err != nil {
+		respondWithAuthError(w, err)
 		return
 	}
 	err = cfg.db.DeleteWorkoutSession(r.Context(), database.DeleteWorkoutSessionParams{
@@ -215,7 +200,8 @@ func (cfg *apiConfig) handlerGetMyXNumberLastSessions(w http.ResponseWriter, r *
 		return
 	}
 	if lastX <= 0 {
-		lastX = 1
+		respondWithError(w, http.StatusBadRequest, "lastx must be greater than 0", nil)
+		return
 	}
 	workSess, err := cfg.db.GetLastNWorkoutSessions(r.Context(), database.GetLastNWorkoutSessionsParams{
 		UserID: userID,
@@ -251,7 +237,7 @@ func (cfg *apiConfig) handlerSearchWOSByDescription(w http.ResponseWriter, r *ht
 	if err != nil {
 		return
 	}
-	query := r.URL.Query().Get("query")
+	query := strings.TrimSpace(r.URL.Query().Get("query"))
 	if query == "" {
 		respondWithError(w, http.StatusBadRequest, "Missing search query", nil)
 		return
@@ -295,6 +281,10 @@ func (cfg *apiConfig) handlerSearchWOSByDateRange(w http.ResponseWriter, r *http
 	endDate, err := time.Parse(time.RFC3339, endStr)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid date format, expected: 2006-01-02T15:04:05Z", err)
+		return
+	}
+	if startDate.After(endDate) {
+		respondWithError(w, http.StatusBadRequest, "start date must be before end date", nil)
 		return
 	}
 	var workSess []database.WorkoutSession

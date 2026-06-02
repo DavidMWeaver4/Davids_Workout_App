@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
@@ -25,33 +26,31 @@ func (cfg *apiConfig) handlerCreateWorkoutExercise(w http.ResponseWriter, r *htt
 	var params parameters
 	err = decoder.Decode(&params)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Error decoding JSON", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), params.WorkoutSessionID)
-	if err == sql.ErrNoRows {
-		respondWithError(w, http.StatusNotFound, "Session not found", nil)
-		return
-	}
+	_, err = cfg.authorizeWorkoutSession(r.Context(), params.WorkoutSessionID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve workout session", err)
+		respondWithAuthError(w, err)
 		return
 	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your session", nil)
-		return
-	}
-	if params.ExerciseName == "" {
+	exerciseName := strings.TrimSpace(params.ExerciseName)
+	if exerciseName == "" {
 		respondWithError(w, http.StatusBadRequest, "Please enter an exercise name", nil)
 		return
 	}
-	exercise, err := cfg.db.GetExerciseFromName(r.Context(), params.ExerciseName)
+	exercise, err := cfg.db.GetExerciseFromName(r.Context(), exerciseName)
 	if err == sql.ErrNoRows {
 		respondWithError(w, http.StatusNotFound, "Exercise not found", nil)
 		return
 	}
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Cannot find exercise", err)
+		return
+	}
+	if params.OrderIndex < 0 {
+		respondWithError(w, http.StatusBadRequest,
+			"order_index must be non-negative", nil)
 		return
 	}
 	workExer, err := cfg.db.CreateWorkoutExercises(r.Context(), database.CreateWorkoutExercisesParams{
@@ -77,37 +76,16 @@ func (cfg *apiConfig) handlerGetWorkoutExercises(w http.ResponseWriter, r *http.
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var execID uuid.UUID
-
-	execID, err = uuid.Parse(idString)
+	exerciseID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
 		return
 	}
-	exercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), execID)
-	if err == sql.ErrNoRows {
-		respondWithError(w, http.StatusNotFound, "Exercise not found", nil)
-		return
-	}
+	exercise, err := cfg.authorizeWorkoutExercise(r.Context(), exerciseID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
+		respondWithAuthError(w, err)
 		return
 	}
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), exercise.WorkoutSessionID)
-	if err == sql.ErrNoRows {
-		respondWithError(w, http.StatusNotFound, "Session not found", nil)
-		return
-	}
-	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Exercise not found", err)
-		return
-	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your exercise", nil)
-		return
-	}
-
 	respondWithJSON(w, http.StatusOK, dbExerciseToResponse(exercise))
 
 }
@@ -116,31 +94,20 @@ func (cfg *apiConfig) handlerGetWorkoutExercisesInSession(w http.ResponseWriter,
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var exeSessID uuid.UUID
-
-	exeSessID, err = uuid.Parse(idString)
+	exerciseSessionID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
 		return
 	}
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), exeSessID)
-	if err == sql.ErrNoRows {
-		respondWithError(w, http.StatusNotFound, "Exercise not found", nil)
-		return
-	}
+	_, err = cfg.authorizeWorkoutSession(r.Context(), exerciseSessionID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Exercise not found", err)
-		return
-	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your exercise session", nil)
+		respondWithAuthError(w, err)
 		return
 	}
 	var sessionExercises []database.WorkoutExercise
-	sessionExercises, err = cfg.db.GetWorkoutsInSession(r.Context(), exeSessID)
+	sessionExercises, err = cfg.db.GetWorkoutsInSession(r.Context(), exerciseSessionID)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve workout exercises", err)
 		return
 	}
 	response := make([]workoutExercise, 0)
@@ -156,40 +123,20 @@ func (cfg *apiConfig) handlerDeleteWorkoutExercises(w http.ResponseWriter, r *ht
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var workoutExercise uuid.UUID
-
-	workoutExercise, err = uuid.Parse(idString)
+	workoutExerciseID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
 		return
 	}
-	exercise, err := cfg.db.GetWorkoutExerciseFromID(r.Context(), workoutExercise)
-	if err == sql.ErrNoRows {
-		respondWithError(w, http.StatusNotFound, "Exercise not found", nil)
-		return
-	}
+	exercise, err := cfg.authorizeWorkoutExercise(r.Context(), workoutExerciseID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid ID", err)
+		respondWithAuthError(w, err)
 		return
 	}
-	workoutSession := exercise.WorkoutSessionID
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workoutSession)
-	if err == sql.ErrNoRows {
-		respondWithError(w, http.StatusNotFound, "Session not found", nil)
-		return
-	}
-	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Exercise not found", err)
-		return
-	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your exercise session", nil)
-		return
-	}
+
 	err = cfg.db.DeleteWorkoutExercises(r.Context(), database.DeleteWorkoutExercisesParams{
-		ID:               workoutExercise,
-		WorkoutSessionID: workoutSession,
+		ID:               workoutExerciseID,
+		WorkoutSessionID: exercise.WorkoutSessionID,
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not delete from database", err)
@@ -203,28 +150,17 @@ func (cfg *apiConfig) handlerGetNumOfWorkoutsInSession(w http.ResponseWriter, r 
 	if err != nil {
 		return
 	}
-	idString := r.PathValue("id")
-	var workoutSession uuid.UUID
-
-	workoutSession, err = uuid.Parse(idString)
+	workoutSessionID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
 		return
 	}
-	workSess, err := cfg.db.GetWorkoutSessionByID(r.Context(), workoutSession)
-	if err == sql.ErrNoRows {
-		respondWithError(w, http.StatusNotFound, "Session not found", nil)
-		return
-	}
+	_, err = cfg.authorizeWorkoutSession(r.Context(), workoutSessionID, userID)
 	if err != nil {
-		respondWithError(w, http.StatusNotFound, "Session not found", err)
+		respondWithAuthError(w, err)
 		return
 	}
-	if workSess.UserID != userID {
-		respondWithError(w, http.StatusForbidden, "Not your exercise session", nil)
-		return
-	}
-	count, err := cfg.db.GetNumberOfExercisesInWorkout(r.Context(), workoutSession)
+	count, err := cfg.db.GetNumberOfExercisesInWorkout(r.Context(), workoutSessionID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Could not retrieve from database", err)
 		return
@@ -233,6 +169,49 @@ func (cfg *apiConfig) handlerGetNumOfWorkoutsInSession(w http.ResponseWriter, r 
 		Count int64 `json:"count"`
 	}
 	respondWithJSON(w, http.StatusOK, countResponse{Count: count})
+}
+func (cfg *apiConfig) handlerUpdateWorkoutExerciseOrder(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+
+	exerciseID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
+		return
+	}
+	workExercise, err := cfg.authorizeWorkoutExercise(r.Context(), exerciseID, userID)
+	if err != nil {
+		respondWithAuthError(w, err)
+		return
+	}
+	type parameters struct {
+		OrderIndex int32 `json:"order_index"`
+	}
+
+	var params parameters
+
+	err = json.NewDecoder(r.Body).Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid request body", err)
+		return
+	}
+	if params.OrderIndex < 0 {
+		respondWithError(w, http.StatusBadRequest, "order_index must be non-negative", nil)
+		return
+	}
+	updatedExercise, err := cfg.db.UpdateWorkoutExerciseOrder(r.Context(), database.UpdateWorkoutExerciseOrderParams{
+		OrderIndex:       params.OrderIndex,
+		ID:               workExercise.ID,
+		WorkoutSessionID: workExercise.WorkoutSessionID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to update exercise", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, dbExerciseToResponse(updatedExercise))
 }
 
 /*
