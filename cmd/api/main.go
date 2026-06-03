@@ -82,6 +82,8 @@ func main() {
 	mux.HandleFunc("GET /api/v1/cardio_and_sets/{id}/distance/all", apiCfg.handlerGetAllSetsDistance)
 	mux.HandleFunc("GET /api/v1/cardio_and_sets/{id}/duration", apiCfg.handlerGetSetDuration)
 	mux.HandleFunc("GET /api/v1/cardio_and_sets/{id}/duration/all", apiCfg.handlerGetAllSetsDuration)
+	//exercise handlers
+	mux.HandleFunc("POST /api/v1/exercises", apiCfg.handlerCreateExercises)
 
 	myServer := http.Server{
 		Addr:    ":" + port,

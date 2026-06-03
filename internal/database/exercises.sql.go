@@ -71,11 +71,16 @@ func (q *Queries) CreateExercises(ctx context.Context, arg CreateExercisesParams
 
 const deleteExerciseByID = `-- name: DeleteExerciseByID :exec
 DELETE FROM exercises
-WHERE id = $1
+WHERE id = $1 AND user_id = $2
 `
 
-func (q *Queries) DeleteExerciseByID(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.ExecContext(ctx, deleteExerciseByID, id)
+type DeleteExerciseByIDParams struct {
+	ID     uuid.UUID
+	UserID uuid.NullUUID
+}
+
+func (q *Queries) DeleteExerciseByID(ctx context.Context, arg DeleteExerciseByIDParams) error {
+	_, err := q.db.ExecContext(ctx, deleteExerciseByID, arg.ID, arg.UserID)
 	return err
 }
 
@@ -123,6 +128,50 @@ func (q *Queries) GetExerciseFromName(ctx context.Context, exerciseName string) 
 	return i, err
 }
 
+const getExercisesByMuscles = `-- name: GetExercisesByMuscles :many
+SELECT id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description
+FROM exercises
+WHERE target_muscles && $1::text[] AND (user_id IS NULL OR user_id = $2)
+`
+
+type GetExercisesByMusclesParams struct {
+	Column1 []string
+	UserID  uuid.NullUUID
+}
+
+func (q *Queries) GetExercisesByMuscles(ctx context.Context, arg GetExercisesByMusclesParams) ([]Exercise, error) {
+	rows, err := q.db.QueryContext(ctx, getExercisesByMuscles, pq.Array(arg.Column1), arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Exercise
+	for rows.Next() {
+		var i Exercise
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ExerciseName,
+			pq.Array(&i.TargetMuscles),
+			&i.Equipment,
+			&i.DifficultyLevel,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getExercisesFromUser = `-- name: GetExercisesFromUser :many
 SELECT id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description FROM exercises
 WHERE user_id = $1
@@ -163,11 +212,16 @@ func (q *Queries) GetExercisesFromUser(ctx context.Context, userID uuid.NullUUID
 
 const getSameDifficultyExercises = `-- name: GetSameDifficultyExercises :many
 SELECT id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description FROM exercises
-WHERE difficulty_level = $1
+WHERE difficulty_level = $1 AND (user_id IS NULL OR user_id = $2)
 `
 
-func (q *Queries) GetSameDifficultyExercises(ctx context.Context, difficultyLevel sql.NullString) ([]Exercise, error) {
-	rows, err := q.db.QueryContext(ctx, getSameDifficultyExercises, difficultyLevel)
+type GetSameDifficultyExercisesParams struct {
+	DifficultyLevel sql.NullString
+	UserID          uuid.NullUUID
+}
+
+func (q *Queries) GetSameDifficultyExercises(ctx context.Context, arg GetSameDifficultyExercisesParams) ([]Exercise, error) {
+	rows, err := q.db.QueryContext(ctx, getSameDifficultyExercises, arg.DifficultyLevel, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -201,11 +255,16 @@ func (q *Queries) GetSameDifficultyExercises(ctx context.Context, difficultyLeve
 
 const getSameEquipmentExercises = `-- name: GetSameEquipmentExercises :many
 SELECT id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description FROM exercises
-WHERE equipment = $1
+WHERE equipment = $1 AND (user_id IS NULL OR user_id = $2)
 `
 
-func (q *Queries) GetSameEquipmentExercises(ctx context.Context, equipment sql.NullString) ([]Exercise, error) {
-	rows, err := q.db.QueryContext(ctx, getSameEquipmentExercises, equipment)
+type GetSameEquipmentExercisesParams struct {
+	Equipment sql.NullString
+	UserID    uuid.NullUUID
+}
+
+func (q *Queries) GetSameEquipmentExercises(ctx context.Context, arg GetSameEquipmentExercisesParams) ([]Exercise, error) {
+	rows, err := q.db.QueryContext(ctx, getSameEquipmentExercises, arg.Equipment, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -239,11 +298,16 @@ func (q *Queries) GetSameEquipmentExercises(ctx context.Context, equipment sql.N
 
 const getSameMuscleExercises = `-- name: GetSameMuscleExercises :many
 SELECT id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description FROM exercises
-WHERE $1 = ANY(target_muscles)
+WHERE $1 = ANY(target_muscles) AND (user_id IS NULL OR user_id = $2)
 `
 
-func (q *Queries) GetSameMuscleExercises(ctx context.Context, targetMuscles []string) ([]Exercise, error) {
-	rows, err := q.db.QueryContext(ctx, getSameMuscleExercises, pq.Array(targetMuscles))
+type GetSameMuscleExercisesParams struct {
+	TargetMuscles []string
+	UserID        uuid.NullUUID
+}
+
+func (q *Queries) GetSameMuscleExercises(ctx context.Context, arg GetSameMuscleExercisesParams) ([]Exercise, error) {
+	rows, err := q.db.QueryContext(ctx, getSameMuscleExercises, pq.Array(arg.TargetMuscles), arg.UserID)
 	if err != nil {
 		return nil, err
 	}
@@ -273,4 +337,144 @@ func (q *Queries) GetSameMuscleExercises(ctx context.Context, targetMuscles []st
 		return nil, err
 	}
 	return items, nil
+}
+
+const listAvailableExercises = `-- name: ListAvailableExercises :many
+SELECT id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description FROM exercises
+WHERE user_id IS NULL OR user_id = $1
+ORDER BY exercise_name
+`
+
+func (q *Queries) ListAvailableExercises(ctx context.Context, userID uuid.NullUUID) ([]Exercise, error) {
+	rows, err := q.db.QueryContext(ctx, listAvailableExercises, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Exercise
+	for rows.Next() {
+		var i Exercise
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ExerciseName,
+			pq.Array(&i.TargetMuscles),
+			&i.Equipment,
+			&i.DifficultyLevel,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const searchExercises = `-- name: SearchExercises :many
+SELECT id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description FROM exercises
+WHERE (user_id IS NULL OR user_id = $1)
+AND ($2::text IS NULL OR difficulty_level = $2)
+AND ($3::text IS NULL OR equipment = $3)
+AND ($4::text[] IS NULL OR target_muscles && $4::text[])
+ORDER BY exercise_name
+`
+
+type SearchExercisesParams struct {
+	UserID  uuid.NullUUID
+	Column2 string
+	Column3 string
+	Column4 []string
+}
+
+func (q *Queries) SearchExercises(ctx context.Context, arg SearchExercisesParams) ([]Exercise, error) {
+	rows, err := q.db.QueryContext(ctx, searchExercises,
+		arg.UserID,
+		arg.Column2,
+		arg.Column3,
+		pq.Array(arg.Column4),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Exercise
+	for rows.Next() {
+		var i Exercise
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ExerciseName,
+			pq.Array(&i.TargetMuscles),
+			&i.Equipment,
+			&i.DifficultyLevel,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Description,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateExercise = `-- name: UpdateExercise :one
+UPDATE exercises
+SET exercise_name = $1,
+    target_muscles = $2,
+    equipment = $3,
+    difficulty_level = $4,
+    description = $5,
+    updated_at = NOW()
+WHERE id = $6 AND user_id = $7
+RETURNING id, user_id, exercise_name, target_muscles, equipment, difficulty_level, created_at, updated_at, description
+`
+
+type UpdateExerciseParams struct {
+	ExerciseName    string
+	TargetMuscles   []string
+	Equipment       sql.NullString
+	DifficultyLevel sql.NullString
+	Description     sql.NullString
+	ID              uuid.UUID
+	UserID          uuid.NullUUID
+}
+
+func (q *Queries) UpdateExercise(ctx context.Context, arg UpdateExerciseParams) (Exercise, error) {
+	row := q.db.QueryRowContext(ctx, updateExercise,
+		arg.ExerciseName,
+		pq.Array(arg.TargetMuscles),
+		arg.Equipment,
+		arg.DifficultyLevel,
+		arg.Description,
+		arg.ID,
+		arg.UserID,
+	)
+	var i Exercise
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ExerciseName,
+		pq.Array(&i.TargetMuscles),
+		&i.Equipment,
+		&i.DifficultyLevel,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Description,
+	)
+	return i, err
 }

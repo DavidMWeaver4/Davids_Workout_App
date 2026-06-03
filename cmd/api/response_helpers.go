@@ -8,6 +8,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type msgResponse struct {
@@ -83,6 +85,13 @@ func nullInt32ToPtr(v sql.NullInt32) *int32 {
 func nullFloat64ToPtr(v sql.NullFloat64) *float64 {
 	if v.Valid {
 		return &v.Float64
+	}
+	return nil
+}
+
+func nullUUIDToUUID(v uuid.NullUUID) *uuid.UUID {
+	if v.Valid {
+		return &v.UUID
 	}
 	return nil
 }

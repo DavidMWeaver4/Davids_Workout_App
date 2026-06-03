@@ -66,3 +66,15 @@ type cardioAndSets struct {
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
+
+type exercise struct {
+	ID              uuid.UUID  `json:"id"`
+	UserID          *uuid.UUID `json:"user_id,omitempty"`
+	ExerciseName    string     `json:"exercise_name"`
+	TargetMuscles   []string   `json:"target_miscles"`
+	Equipment       *string    `json:"equipment,omitempty"`
+	DifficultyLevel *string    `json:"difficulty_level,omitempty"`
+	Description     *string    `json:"description,omitempty"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
