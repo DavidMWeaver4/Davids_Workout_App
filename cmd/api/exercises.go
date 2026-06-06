@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// TODO
 func (cfg *apiConfig) handlerCreateExercises(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
@@ -65,18 +64,135 @@ func (cfg *apiConfig) handlerCreateExercises(w http.ResponseWriter, r *http.Requ
 }
 
 func (cfg *apiConfig) handlerDeleteExercisesByID(w http.ResponseWriter, r *http.Request) {
-	//TODO
-	// ownership check
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	exerciseID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
+		return
+	}
+	authorizedExercise, err := cfg.authorizeExercise(r.Context(), exerciseID, userID)
+	if err != nil {
+		respondWithAuthError(w, err)
+		return
+	}
+	err = cfg.db.DeleteExerciseByID(r.Context(), database.DeleteExerciseByIDParams{
+		ID:     authorizedExercise.ID,
+		UserID: authorizedExercise.UserID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to delete exercise", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, msgResponse{"Deleted successful"})
+
 }
 func (cfg *apiConfig) handlerGetExerciseFromID(w http.ResponseWriter, r *http.Request) {
-	//TODO
+	exerciseID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
+		return
+	}
+	exercise, err := cfg.db.GetExerciseFromID(r.Context(), exerciseID)
+	if err == sql.ErrNoRows {
+		respondWithError(w, http.StatusNotFound, "Exercise not found", nil)
+		return
+	}
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get exercise", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, dbExerciseLibraryToResponse(exercise))
 }
-func (cfg *apiConfig) handlerListAvaiableExercises(w http.ResponseWriter, r *http.Request) {
-	//TODO
+func (cfg *apiConfig) handlerSearchExercises(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	nullUserID := uuid.NullUUID{
+		UUID:  userID,
+		Valid: true,
+	}
+	muscle := r.URL.Query().Get("muscle")
+	equipment := r.URL.Query().Get("equipment")
+	difficulty := r.URL.Query().Get("difficulty")
+	var muscleParam []string
+
+	if muscle != "" {
+		muscleParam = []string{muscle}
+	}
+
+	exercises, err := cfg.db.SearchExercises(r.Context(), database.SearchExercisesParams{
+		UserID:  nullUserID,
+		Column2: difficulty,
+		Column3: equipment,
+		Column4: muscleParam,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve exercises", err)
+		return
+	}
+
+	response := make([]exercise, 0)
+	for _, el := range exercises {
+		response = append(response, dbExerciseLibraryToResponse(el))
+	}
+	respondWithJSON(w, http.StatusOK, response)
 }
 func (cfg *apiConfig) handlerUpdateExercise(w http.ResponseWriter, r *http.Request) {
-	//TODO
-	//ownership check
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+	type parameters struct {
+		ExerciseName    string   `json:"exercise_name"`
+		TargetMuscles   []string `json:"target_muscles"`
+		Equipment       string   `json:"equipment,omitempty"`
+		DifficultyLevel string   `json:"difficulty_level,omitempty"`
+		Description     string   `json:"description,omitempty"`
+	}
+	exerciseID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
+		return
+	}
+	authorizedExercise, err := cfg.authorizeExercise(r.Context(), exerciseID, userID)
+	if err != nil {
+		respondWithAuthError(w, err)
+		return
+	}
+	decoder := json.NewDecoder(r.Body)
+	var params parameters
+	err = decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid request body", err)
+		return
+	}
+	updatedExercise, err := cfg.db.UpdateExercise(r.Context(), database.UpdateExerciseParams{
+		ExerciseName:  params.ExerciseName,
+		TargetMuscles: params.TargetMuscles,
+		Equipment: sql.NullString{
+			String: params.Equipment,
+			Valid:  params.Equipment != "",
+		},
+		DifficultyLevel: sql.NullString{
+			String: params.DifficultyLevel,
+			Valid:  params.DifficultyLevel != "",
+		},
+		Description: sql.NullString{
+			String: params.Description,
+			Valid:  params.Description != "",
+		},
+		ID:     authorizedExercise.ID,
+		UserID: authorizedExercise.UserID,
+	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to update database", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, dbExerciseLibraryToResponse(updatedExercise))
 }
 
 /*

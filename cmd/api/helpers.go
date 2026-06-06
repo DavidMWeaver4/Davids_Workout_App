@@ -86,3 +86,17 @@ func (cfg *apiConfig) authorizeCardioSet(ctx context.Context, cardioSetID uuid.U
 
 	return cardioSet, nil
 }
+
+func (cfg *apiConfig) authorizeExercise(ctx context.Context, exerciseID uuid.UUID, userID uuid.UUID) (database.Exercise, error) {
+	exercise, err := cfg.db.GetExerciseFromID(ctx, exerciseID)
+	if err == sql.ErrNoRows {
+		return database.Exercise{}, ErrNotFound
+	}
+	if err != nil {
+		return database.Exercise{}, err
+	}
+	if !exercise.UserID.Valid || exercise.UserID.UUID != userID {
+		return database.Exercise{}, ErrForbidden
+	}
+	return exercise, nil
+}

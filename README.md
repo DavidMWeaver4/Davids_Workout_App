@@ -143,17 +143,17 @@ Base URL: `/api/v1`
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/exercises` | Create a custom exercise |
-| GET | `/exercises/{id}` | Get exercise by ID *(TODO)*|
-| GET | `/exercises` | List/search available exercises *(TODO)*|
-| PUT | `/exercises/{id}` | Update a custom exercise *(TODO)*|
-| DELETE | `/exercises/{id}` | Delete a custom exercise *(TODO)*|
+| DELETE | `/exercises/{id}` | Delete a custom exercise |
+| GET | `/exercises/search` | List/search available exercises |
+| GET | `/exercises/{id}` | Get exercise by ID |
+| PUT | `/exercises/{id}` | Update a custom exercise |
 
 
 
 ## TODO
 - [x] Weights and sets handlers
 - [X] Cardio handlers
-- [ ] Exercise handlers
+- [X] Exercise handlers
 - [ ] Unit tests
 - [ ] CI/CD pipeline
 - [ ] Frontend Client
