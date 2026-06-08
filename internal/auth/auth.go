@@ -31,9 +31,9 @@ func MakeRefreshToken() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	string_token := hex.EncodeToString(token)
+	stringToken := hex.EncodeToString(token)
 
-	return string_token, nil
+	return stringToken, nil
 }
 
 func GetAPIKey(headers http.Header) (string, error) {

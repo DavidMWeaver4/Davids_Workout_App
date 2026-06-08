@@ -154,7 +154,7 @@ Base URL: `/api/v1`
 - [x] Weights and sets handlers
 - [X] Cardio handlers
 - [X] Exercise handlers
-- [ ] Unit tests
+- [ ] Unit tests (Currently implementing)
 - [ ] CI/CD pipeline
 - [ ] Frontend Client
 
@@ -173,8 +173,6 @@ cd Davids_Workout_App
 ```bash
 go build
 ```
-
-> Sorry, test suite is still TODO
 
 ### Run the test suite
 
