@@ -171,13 +171,13 @@ cd Davids_Workout_App
 ### Build the compiled binary
 
 ```bash
-go build
+make build
 ```
 
 ### Run the test suite
 
 ```bash
-go test ./...
+make test
 ```
 
 ### Submit a pull request

@@ -3,7 +3,7 @@ export
 IMAGE_NAME := Davids_Workout_App
 CONTAINER_NAME := Davids_Workout_App_Container
 
-.PHONY: build up down shell clean
+.PHONY: build up down shell clean test test-db-reset
 
 build:
 	docker build -t $(IMAGE_NAME) .
@@ -32,6 +32,13 @@ sqlc:
 run:
 	go run ./cmd/api/
 
+test-db-reset:
+	goose -dir internal/db/migrations postgres "$(TEST_DB_URL)" reset
+	goose -dir internal/db/migrations postgres "$(TEST_DB_URL)" up
+
+test: test-db-reset
+	go test ./...
+
 help:
 	@echo "Available commands:"
 	@echo "  make build         Build docker image"
@@ -43,3 +50,4 @@ help:
 	@echo "  make shell         Open shell in container"
 	@echo "  make migrate-down  Roll back last migration"
 	@echo "  make sqlc          Regenerate sqlc code"
+	@echo "  make test          Run Go unit tests"
