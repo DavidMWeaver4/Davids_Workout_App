@@ -3,7 +3,7 @@ export
 IMAGE_NAME := Davids_Workout_App
 CONTAINER_NAME := Davids_Workout_App_Container
 
-.PHONY: build up down shell clean test test-db-reset
+.PHONY: build up down shell clean test test-db-reset test-cover
 
 build:
 	docker build -t $(IMAGE_NAME) .
@@ -39,6 +39,10 @@ test-db-reset:
 test: test-db-reset
 	go test ./...
 
+test-cover: test-db-reset
+	go test -coverprofile=coverage.out ./...
+	go tool cover -func=coverage.out
+
 help:
 	@echo "Available commands:"
 	@echo "  make build         Build docker image"
@@ -51,3 +55,4 @@ help:
 	@echo "  make migrate-down  Roll back last migration"
 	@echo "  make sqlc          Regenerate sqlc code"
 	@echo "  make test          Run Go unit tests"
+	@echo "  make test-cover    Run Go tests with coverage"
