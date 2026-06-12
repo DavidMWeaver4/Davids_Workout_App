@@ -56,8 +56,9 @@ In order to run this application you need:
 
 > Local Dev mode
 1. Requires:
-    - Go
+    - Go (I build with version 1.25.6)
     - Goose
+    - Copy `.env.example` to `.env` and fill in your values
 2. Start the Database:
   ```bash
   make up-db
