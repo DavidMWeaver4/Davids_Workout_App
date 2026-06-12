@@ -10,6 +10,23 @@ services:
       - "5432:5432"
     volumes:
       - mydata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d workout_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: Davids_Workout_App_Container
+    ports:
+      - "8080:8080"
+    environment:
+      - PLATFORM=docker
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   mydata:

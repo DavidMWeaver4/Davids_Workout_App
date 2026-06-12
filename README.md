@@ -35,28 +35,45 @@ Tools used in project:
 - JWT Authentication
 - Docker
 
->This project is not finished and is in active development
+> This project is not finished and is in active development
 
 ## Getting Started
 In order to run this application you need:
-- Golang 1.25.6
 - Docker (I built on version 4.71.0)
 
-
-1. Clone the repo
-2. Copy `.env.example` to `.env` and fill in your values
-3. Run `make help` to see all available commands
-
 ## Quick Start
-```bash
-make up          # start the database
-make migrate-up  # run migrations
-make run         # start the API
-```
+
+> Using Docker
+1. Clone the repo
+2. Run:
+  ```bash
+  make up
+  ```
+3. To shut down:
+  ```bash
+  make down
+  ```
+
+> Local Dev mode
+1. Requires:
+    - Go
+    - Goose
+2. Start the Database:
+  ```bash
+  make up-db
+  ```
+3. Run migrations:
+  ```bash
+  make migrate-up
+  ```
+4. Start the API:
+  ```bash
+  make run 
+  ```
 
 ## Usage
 A few simple commands to test. 
->Emails are unique so please change if these do not work.
+> Emails are unique so please change if these do not work.
 
 ```bash
 # register

@@ -1,9 +1,9 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -12,23 +12,29 @@ import (
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/auth"
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 )
 
 func newTestAPIConfig(t *testing.T) *apiConfig {
 	t.Helper()
-	/*
-		err := godotenv.Load(".env")
-		if err != nil {
-			t.Fatalf("failed to load .env: %v", err)
-		}
-	*/
-	db, err := sql.Open("postgres", os.Getenv("TEST_DB_URL"))
+	err := godotenv.Load("../../.env")
+	if err != nil {
+		log.Println("No .env file was found!")
+	}
+
+	testDBURL := os.Getenv("TEST_DB_URL")
+	if testDBURL == "" {
+		testDBURL = "postgres://postgres:12345@localhost:5432/workout_tracker_test?sslmode=disable"
+	}
+	if !strings.Contains(testDBURL, "test") {
+		t.Fatal("TEST_DB_URL does not appear to be a test database")
+	}
+
+	db, err := sql.Open("postgres", testDBURL)
 	if err != nil {
 		t.Fatalf("failed to connect to test db: %v", err)
 	}
-	if !strings.Contains(os.Getenv("TEST_DB_URL"), "test") {
-		t.Fatal("TEST_DB_URL does not appear to be a test database")
-	}
+
 	t.Cleanup(func() { db.Close() })
 	return &apiConfig{db: database.New(db)}
 }
@@ -36,7 +42,7 @@ func newTestAPIConfig(t *testing.T) *apiConfig {
 func createTestUser(t *testing.T, cfg *apiConfig) database.User {
 	t.Helper()
 	hash := createTestHashPassword(t, "testpassword123")
-	user, err := cfg.db.CreateUser(context.Background(), database.CreateUserParams{
+	user, err := cfg.db.CreateUser(t.Context(), database.CreateUserParams{
 		ID:           uuid.New(),
 		Email:        fmt.Sprintf("%v@test.com", time.Now().UTC()),
 		PasswordHash: hash,
@@ -47,7 +53,7 @@ func createTestUser(t *testing.T, cfg *apiConfig) database.User {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 	t.Cleanup(func() {
-		err := cfg.db.DeleteUserByID(context.Background(), user.ID)
+		err := cfg.db.DeleteUserByID(t.Context(), user.ID)
 		if err != nil {
 			t.Errorf("failed to cleanup user: %v", err)
 		}
@@ -66,7 +72,7 @@ func createTestHashPassword(t *testing.T, password string) string {
 
 func createTestWorkoutSession(t *testing.T, cfg *apiConfig, userID uuid.UUID) database.WorkoutSession {
 	t.Helper()
-	session, err := cfg.db.CreateWorkoutSessions(context.Background(), database.CreateWorkoutSessionsParams{
+	session, err := cfg.db.CreateWorkoutSessions(t.Context(), database.CreateWorkoutSessionsParams{
 		UserID:      userID,
 		WorkoutDate: time.Now().UTC(),
 		Description: sql.NullString{
@@ -84,7 +90,7 @@ func createTestWorkoutSession(t *testing.T, cfg *apiConfig, userID uuid.UUID) da
 		t.Fatalf("failed to create test workout session: %v", err)
 	}
 	t.Cleanup(func() {
-		err := cfg.db.DeleteWorkoutSession(context.Background(), database.DeleteWorkoutSessionParams{
+		err := cfg.db.DeleteWorkoutSession(t.Context(), database.DeleteWorkoutSessionParams{
 			ID:     session.ID,
 			UserID: session.UserID})
 		if err != nil {
@@ -96,7 +102,7 @@ func createTestWorkoutSession(t *testing.T, cfg *apiConfig, userID uuid.UUID) da
 
 func createTestWorkoutExercise(t *testing.T, cfg *apiConfig, session database.WorkoutSession, exerciseID uuid.UUID) database.WorkoutExercise {
 	t.Helper()
-	woExercise, err := cfg.db.CreateWorkoutExercises(context.Background(), database.CreateWorkoutExercisesParams{
+	woExercise, err := cfg.db.CreateWorkoutExercises(t.Context(), database.CreateWorkoutExercisesParams{
 		ID:               uuid.New(),
 		WorkoutSessionID: session.ID,
 		ExerciseID:       exerciseID,
@@ -109,7 +115,7 @@ func createTestWorkoutExercise(t *testing.T, cfg *apiConfig, session database.Wo
 		t.Fatalf("failed to create test workout exercise: %v", err)
 	}
 	t.Cleanup(func() {
-		err := cfg.db.DeleteWorkoutExercises(context.Background(), database.DeleteWorkoutExercisesParams{
+		err := cfg.db.DeleteWorkoutExercises(t.Context(), database.DeleteWorkoutExercisesParams{
 			ID:               woExercise.ID,
 			WorkoutSessionID: woExercise.WorkoutSessionID,
 		})
@@ -122,7 +128,7 @@ func createTestWorkoutExercise(t *testing.T, cfg *apiConfig, session database.Wo
 
 func createTestExercise(t *testing.T, cfg *apiConfig, userID uuid.UUID) database.Exercise {
 	t.Helper()
-	exercise, err := cfg.db.CreateExercises(context.Background(), database.CreateExercisesParams{
+	exercise, err := cfg.db.CreateExercises(t.Context(), database.CreateExercisesParams{
 		ID: uuid.New(),
 		UserID: uuid.NullUUID{
 			UUID:  userID,
@@ -150,17 +156,48 @@ func createTestExercise(t *testing.T, cfg *apiConfig, userID uuid.UUID) database
 	}
 
 	t.Cleanup(func() {
-		err := cfg.db.DeleteExerciseByID(
-			context.Background(),
-			database.DeleteExerciseByIDParams{
-				ID:     exercise.ID,
-				UserID: exercise.UserID,
-			},
-		)
+		err := cfg.db.DeleteExerciseByID(t.Context(), database.DeleteExerciseByIDParams{
+			ID:     exercise.ID,
+			UserID: exercise.UserID,
+		})
 		if err != nil {
 			t.Errorf("failed to cleanup exercise: %v", err)
 		}
 	})
 
 	return exercise
+}
+
+func createTestWeightSet(t *testing.T, cfg *apiConfig, exercise database.WorkoutExercise) database.WeightsAndSet {
+	t.Helper()
+	weightSet, err := cfg.db.CreateWeightsAndSets(t.Context(), database.CreateWeightsAndSetsParams{
+		WorkoutExercisesID: exercise.ID,
+		Weight:             25,
+		IsKilograms:        true,
+		SetNumber:          1,
+		RepsTarget:         10,
+		RepsActual:         10,
+		DurationSeconds: sql.NullInt32{
+			Int32: 30,
+			Valid: true,
+		},
+		RestTimeSeconds: sql.NullInt32{
+			Int32: 90,
+			Valid: true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create test weight set: %v", err)
+	}
+	t.Cleanup(func() {
+		err := cfg.db.DeleteWeightAndSets(t.Context(), database.DeleteWeightAndSetsParams{
+			ID:                 weightSet.ID,
+			WorkoutExercisesID: weightSet.WorkoutExercisesID,
+		})
+		if err != nil {
+			t.Errorf("failed to cleanup weight set: %v", err)
+		}
+	})
+
+	return weightSet
 }

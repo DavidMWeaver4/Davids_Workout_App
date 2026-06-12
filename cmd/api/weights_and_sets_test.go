@@ -9,31 +9,25 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestAuthorizeWorkoutExercise_Success(t *testing.T) {
-	x := newWorkoutExerciseFixture(t)
-
-	gotWOExercise, err := x.cfg.authorizeWorkoutExercise(x.ctx, x.woExercise.ID, x.user.ID)
+func TestAuthorizeWeightAndSets_Success(t *testing.T) {
+	x := newWeightSetFixture(t)
+	gotWeightSet, err := x.cfg.authorizeWeightSet(x.ctx, x.weightSet.ID, x.user.ID)
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-
-	if gotWOExercise.ID != x.woExercise.ID {
-		t.Fatalf("expected exercise ID %v, got %v", x.woExercise.ID, gotWOExercise.ID)
+	if gotWeightSet.ID != x.weightSet.ID {
+		t.Fatalf("expected exercise ID %v, got %v", x.weightSet.ID, gotWeightSet.ID)
 	}
-
-	if gotWOExercise.WorkoutSessionID != x.session.ID {
-		t.Fatalf("expected session ID %v, got %v", x.session.ID, gotWOExercise.WorkoutSessionID)
+	if gotWeightSet.WorkoutExercisesID != x.weightSet.WorkoutExercisesID {
+		t.Fatalf("expected exercise ID %v, got %v: ", x.weightSet.WorkoutExercisesID, gotWeightSet.WorkoutExercisesID)
 	}
 }
 
-func TestAuthorizeWorkoutExercise_Forbidden(t *testing.T) {
-	x := newWorkoutExerciseFixture(t)
-
+func TestAuthorizeWeightAndSets_Forbidden(t *testing.T) {
+	x := newWeightSetFixture(t)
 	otherUser := createTestUser(t, x.cfg)
-
-	_, err := x.cfg.authorizeWorkoutExercise(x.ctx, x.woExercise.ID, otherUser.ID)
-
+	_, err := x.cfg.authorizeWeightSet(x.ctx, x.weightSet.ID, otherUser.ID)
 	if err == nil {
 		t.Fatal("expected ErrForbidden, got nil")
 	}
@@ -43,11 +37,9 @@ func TestAuthorizeWorkoutExercise_Forbidden(t *testing.T) {
 	}
 }
 
-func TestAuthorizeWorkoutExercise_NotFound(t *testing.T) {
-	x := newWorkoutExerciseFixture(t)
-
-	_, err := x.cfg.authorizeWorkoutExercise(x.ctx, uuid.New(), x.user.ID)
-
+func TestAuthorizeWeightAndSets_NotFound(t *testing.T) {
+	x := newWeightSetFixture(t)
+	_, err := x.cfg.authorizeWeightSet(x.ctx, uuid.New(), x.user.ID)
 	if err == nil {
 		t.Fatal("expected ErrNotFound, got nil")
 	}
@@ -57,30 +49,31 @@ func TestAuthorizeWorkoutExercise_NotFound(t *testing.T) {
 	}
 }
 
-type woExerciseFixture struct {
+type weightSetFixture struct {
 	ctx        context.Context
 	cfg        *apiConfig
 	user       database.User
 	session    database.WorkoutSession
 	exercise   database.Exercise
 	woExercise database.WorkoutExercise
+	weightSet  database.WeightsAndSet
 }
 
-func newWorkoutExerciseFixture(t *testing.T) woExerciseFixture {
+func newWeightSetFixture(t *testing.T) weightSetFixture {
 	t.Helper()
-
 	cfg := newTestAPIConfig(t)
 	user := createTestUser(t, cfg)
 	session := createTestWorkoutSession(t, cfg, user.ID)
 	exercise := createTestExercise(t, cfg, user.ID)
 	woExercise := createTestWorkoutExercise(t, cfg, session, exercise.ID)
-
-	return woExerciseFixture{
+	weightSet := createTestWeightSet(t, cfg, woExercise)
+	return weightSetFixture{
 		ctx:        context.Background(),
 		cfg:        cfg,
 		user:       user,
 		session:    session,
 		exercise:   exercise,
 		woExercise: woExercise,
+		weightSet:  weightSet,
 	}
 }

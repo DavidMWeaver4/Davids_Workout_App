@@ -5,42 +5,35 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
 	"github.com/google/uuid"
 )
 
 func TestAuthorizeWorkoutSession_Success(t *testing.T) {
-	ctx := context.Background()
-	cfg := newTestAPIConfig(t)
-	user := createTestUser(t, cfg)
-	session := createTestWorkoutSession(t, cfg, user.ID)
+	x := newWorkoutSessionFixture(t)
 
-	gotSession, err := cfg.authorizeWorkoutSession(ctx, session.ID, user.ID)
+	gotSession, err := x.cfg.authorizeWorkoutSession(x.ctx, x.session.ID, x.user.ID)
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if gotSession.ID != session.ID {
-		t.Fatalf("expected session ID %v, got %v", session.ID, gotSession.ID)
+	if gotSession.ID != x.session.ID {
+		t.Fatalf("expected session ID %v, got %v", x.session.ID, gotSession.ID)
 	}
 
-	if gotSession.UserID != user.ID {
-		t.Fatalf("expected user ID %v, got %v", user.ID, gotSession.UserID)
+	if gotSession.UserID != x.user.ID {
+		t.Fatalf("expected user ID %v, got %v", x.user.ID, gotSession.UserID)
 	}
 }
 
 func TestAuthorizeWorkoutSession_Forbidden(t *testing.T) {
-	ctx := context.Background()
-	cfg := newTestAPIConfig(t)
-
-	user := createTestUser(t, cfg)
-	otherUser := createTestUser(t, cfg)
-	if user.ID == otherUser.ID {
+	x := newWorkoutSessionFixture(t)
+	otherUser := createTestUser(t, x.cfg)
+	if x.user.ID == otherUser.ID {
 		t.Fatal("test setup error: users have same ID")
 	}
-
-	session := createTestWorkoutSession(t, cfg, user.ID)
-	_, err := cfg.authorizeWorkoutSession(ctx, session.ID, otherUser.ID)
+	_, err := x.cfg.authorizeWorkoutSession(x.ctx, x.session.ID, otherUser.ID)
 	if err == nil {
 		t.Fatal("expected ErrForbidden, got nil")
 	}
@@ -50,17 +43,36 @@ func TestAuthorizeWorkoutSession_Forbidden(t *testing.T) {
 }
 
 func TestAuthorizeWorkoutSession_NotFound(t *testing.T) {
-	ctx := context.Background()
-	cfg := newTestAPIConfig(t)
-	user := createTestUser(t, cfg)
-	_ = createTestWorkoutSession(t, cfg, user.ID)
+	x := newWorkoutSessionFixture(t)
 	//want to make sure there is something inside the db even if its going to fail
 
-	_, err := cfg.authorizeWorkoutSession(ctx, uuid.New(), user.ID)
+	_, err := x.cfg.authorizeWorkoutSession(x.ctx, uuid.New(), x.user.ID)
 	if err == nil {
 		t.Fatal("expected ErrForbidden, got nil")
 	}
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+type workoutSessionFixture struct {
+	ctx     context.Context
+	cfg     *apiConfig
+	user    database.User
+	session database.WorkoutSession
+}
+
+func newWorkoutSessionFixture(t *testing.T) workoutSessionFixture {
+	t.Helper()
+
+	cfg := newTestAPIConfig(t)
+	user := createTestUser(t, cfg)
+	session := createTestWorkoutSession(t, cfg, user.ID)
+
+	return workoutSessionFixture{
+		ctx:     context.Background(),
+		cfg:     cfg,
+		user:    user,
+		session: session,
 	}
 }

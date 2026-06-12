@@ -16,9 +16,24 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file was found!")
 	}
+	//If you don't want to use defaults, please make a .env like the .env.example file
 	envPlatform := os.Getenv("PLATFORM")
-	dbUrl := os.Getenv("DB_URL")
+	if envPlatform == "" {
+		envPlatform = "dev"
+	}
+	var dbUrl string
+	if envPlatform == "docker" {
+		dbUrl = "postgres://postgres:12345@db:5432/workout_tracker?sslmode=disable"
+	} else {
+		dbUrl = os.Getenv("DB_URL")
+		if dbUrl == "" {
+			dbUrl = "postgres://postgres:12345@localhost:5432/workout_tracker?sslmode=disable"
+		}
+	}
 	secretKey := os.Getenv("SECRET")
+	if secretKey == "" {
+		secretKey = "yVTDARmVD4TMfYTg1kWWtbjwxyVB8wXafOogY+IHrC0="
+	}
 
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {

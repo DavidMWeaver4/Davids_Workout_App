@@ -1,15 +1,18 @@
 include .env
 export
-IMAGE_NAME := Davids_Workout_App
+IMAGE_NAME := davids_workout_app
 CONTAINER_NAME := Davids_Workout_App_Container
 
-.PHONY: build up down shell clean test test-db-reset test-cover
+.PHONY: build up up-db down shell clean logs test test-db-reset test-cover
 
 build:
 	docker build -t $(IMAGE_NAME) .
 
 up:
-	docker compose up -d
+	docker compose up --build -d
+
+up-db:
+	docker compose up db -d
 
 shell:
 	docker exec -it $(CONTAINER_NAME) /bin/bash
@@ -19,6 +22,9 @@ down:
 
 clean:
 	docker compose down --volumes --remove-orphans
+
+logs:
+	docker compose logs -f
 
 migrate-up:
 	goose -dir internal/db/migrations postgres "$(DB_URL)" up
@@ -47,8 +53,10 @@ help:
 	@echo "Available commands:"
 	@echo "  make build         Build docker image"
 	@echo "  make up            Start containers"
+	@echo "  make up-db         Start only the db container"
 	@echo "  make down          Stop containers"
 	@echo "  make clean         Stop containers and wipe volumes"
+	@echo "  make logs          Get docker logs"
 	@echo "  make migrate-up    Run DB migrations"
 	@echo "  make run           Run API locally"
 	@echo "  make shell         Open shell in container"
