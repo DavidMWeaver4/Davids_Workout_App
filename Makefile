@@ -2,6 +2,7 @@ include .env
 export
 IMAGE_NAME := davids_workout_app
 CONTAINER_NAME := Davids_Workout_App_Container
+DB_CONTAINER_NAME := davids_workout_db_container
 
 .PHONY: build up up-db down shell clean logs test test-db-reset test-cover
 
@@ -39,7 +40,8 @@ run:
 	go run ./cmd/api/
 
 test-db-reset:
-	goose -dir internal/db/migrations postgres "$(TEST_DB_URL)" reset
+	docker exec -i $(DB_CONTAINER_NAME) psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS workout_tracker_test;"
+	docker exec -i $(DB_CONTAINER_NAME) psql -U postgres -d postgres -c "CREATE DATABASE workout_tracker_test;"
 	goose -dir internal/db/migrations postgres "$(TEST_DB_URL)" up
 
 test: test-db-reset
