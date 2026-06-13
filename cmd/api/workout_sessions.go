@@ -193,19 +193,19 @@ func (cfg *apiConfig) handlerGetMyXNumberLastSessions(w http.ResponseWriter, r *
 		return
 	}
 
-	var lastX int
-	lastX, err = strconv.Atoi(lastXString)
+	parsedLastX, err := strconv.ParseInt(lastXString, 10, 32)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid number", err)
 		return
 	}
-	if lastX <= 0 {
+
+	if parsedLastX <= 0 {
 		respondWithError(w, http.StatusBadRequest, "lastx must be greater than 0", nil)
 		return
 	}
 	workSess, err := cfg.db.GetLastNWorkoutSessions(r.Context(), database.GetLastNWorkoutSessionsParams{
 		UserID: userID,
-		Limit:  int32(lastX),
+		Limit:  int32(parsedLastX),
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve workout session", err)

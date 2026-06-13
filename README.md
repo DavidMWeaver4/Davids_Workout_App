@@ -72,8 +72,15 @@ In order to run this application you need:
   make run 
   ```
 
+## Deployment Notes
+For ease of testing, this project includes default local database credentials and a fallback JWT secret so the application can be run immediately after cloning.
+
+These defaults exist only for local development and portfolio demonstration purposes.
+
+In a real deployment environment, all configuration values should be supplied through environment variables.
+
 ## Usage
-A few simple commands to test. 
+A few simple commands to start testing. 
 > Emails are unique so please change if these do not work.
 
 ```bash
@@ -169,9 +176,6 @@ Base URL: `/api/v1`
 
 
 ## TODO
-- [x] Weights and sets handlers
-- [X] Cardio handlers
-- [X] Exercise handlers
 - [ ] Unit tests (Currently implementing)
 - [ ] CI/CD pipeline
 - [ ] Frontend Client
@@ -201,7 +205,3 @@ make test
 ### Submit a pull request
 
 If you'd like to contribute, please fork the repository and open a pull request to the `main` branch.
-
-## Bug finding
-
-If you find a bug, please email me at [dmweaver4@gmail.com](mailto:dmweaver4@gmail.com)

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
 	"github.com/joho/godotenv"
@@ -17,21 +18,32 @@ func main() {
 		log.Println("No .env file was found!")
 	}
 	//If you don't want to use defaults, please make a .env like the .env.example file
+	//
+	//These defaults are only so that the repo can be cloned and immediately run
+	//This would not be used in real deployment, only added for ease of use
+	//so that potential employers can easily run the repo and test
+
 	envPlatform := os.Getenv("PLATFORM")
 	if envPlatform == "" {
 		envPlatform = "dev"
 	}
 	var dbUrl string
 	if envPlatform == "docker" {
+		// Intentionally hardcoded so the project runs immediately after cloning.
+		// #nosec G101 -- development fallback
 		dbUrl = "postgres://postgres:12345@db:5432/workout_tracker?sslmode=disable"
 	} else {
 		dbUrl = os.Getenv("DB_URL")
 		if dbUrl == "" {
+			// Intentionally hardcoded so the project runs immediately after cloning.
+			// #nosec G101 -- development fallback
 			dbUrl = "postgres://postgres:12345@localhost:5432/workout_tracker?sslmode=disable"
 		}
 	}
-	secretKey := os.Getenv("SECRET")
+	secretKey := os.Getenv("JWT_SECRET")
 	if secretKey == "" {
+		// Intentionally hardcoded so the project runs immediately after cloning.
+		// #nosec G101 -- development fallback
 		secretKey = "yVTDARmVD4TMfYTg1kWWtbjwxyVB8wXafOogY+IHrC0="
 	}
 
@@ -105,8 +117,12 @@ func main() {
 	mux.HandleFunc("PUT /api/v1/exercises/{id}", apiCfg.handlerUpdateExercise)
 
 	myServer := http.Server{
-		Addr:    ":" + port,
-		Handler: middlewareLogger(mux),
+		Addr:              ":" + port,
+		Handler:           middlewareLogger(mux),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       30 * time.Second,
 	}
 	log.Printf("Serving files from %s on port: %s\n", filepathRoot, port)
 	log.Fatal(myServer.ListenAndServe())

@@ -25,6 +25,8 @@ func newTestAPIConfig(t *testing.T) *apiConfig {
 
 	testDBURL := os.Getenv("TEST_DB_URL")
 	if testDBURL == "" {
+		// Intentionally hardcoded so the project runs immediately after cloning.
+		// #nosec G101 -- development fallback
 		testDBURL = "postgres://postgres:12345@localhost:5432/workout_tracker_test?sslmode=disable"
 	}
 	if !strings.Contains(testDBURL, "test") {
@@ -36,7 +38,12 @@ func newTestAPIConfig(t *testing.T) *apiConfig {
 		t.Fatalf("failed to connect to test db: %v", err)
 	}
 
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() {
+		err := db.Close()
+		if err != nil {
+			t.Errorf("failed to close db: %v", err)
+		}
+	})
 	return &apiConfig{db: database.New(db)}
 }
 
