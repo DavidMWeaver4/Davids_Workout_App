@@ -91,6 +91,7 @@ func main() {
 	mux.HandleFunc("GET /api/v1/workout_sessions/{session_id}/exercises", apiCfg.handlerGetWorkoutExercisesInSession)
 	mux.HandleFunc("DELETE /api/v1/workout_exercises/{id}", apiCfg.handlerDeleteWorkoutExercises)
 	mux.HandleFunc("GET /api/v1/workout_sessions/{session_id}/exercises/count", apiCfg.handlerGetNumOfWorkoutsInSession)
+	mux.HandleFunc("PUT /api/v1/workout_exercises/{id}", apiCfg.handlerUpdateWorkoutExerciseOrder)
 	//weights and sets handlers
 	mux.HandleFunc("POST /api/v1/weights_and_sets", apiCfg.handlerCreateWeightsAndSets)
 	mux.HandleFunc("GET /api/v1/workout_exercises/{id}/sets", apiCfg.handlerGetAllSetsFromSession)

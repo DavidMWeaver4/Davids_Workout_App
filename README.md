@@ -1,5 +1,5 @@
 ## David's Workout App
-
+![Status](https://github.com/DavidMWeaver4/Davids_Workout_App/actions/workflows/ci.yml/badge.svg)
 A RESTful workout tracking API built with Go and PostgreSQL.
 
 ## Features

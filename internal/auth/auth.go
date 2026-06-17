@@ -14,7 +14,7 @@ import (
 func GetBearerToken(headers http.Header) (string, error) {
 	authHeader := headers.Get("Authorization")
 	if authHeader == "" {
-		return "", fmt.Errorf("Missing authorization token")
+		return "", fmt.Errorf("missing authorization token")
 	}
 
 	parts := strings.Fields(authHeader)
@@ -39,7 +39,7 @@ func MakeRefreshToken() (string, error) {
 func GetAPIKey(headers http.Header) (string, error) {
 	authHeader := headers.Get("Authorization")
 	if authHeader == "" {
-		return "", fmt.Errorf("Missing authorization token")
+		return "", fmt.Errorf("missing authorization token")
 	}
 
 	parts := strings.Fields(authHeader)
