@@ -180,6 +180,7 @@ func createTestExercise(t *testing.T, cfg *apiConfig, userID uuid.UUID) database
 func createTestWeightSet(t *testing.T, cfg *apiConfig, exercise database.WorkoutExercise) database.WeightsAndSet {
 	t.Helper()
 	weightSet, err := cfg.db.CreateWeightsAndSets(context.Background(), database.CreateWeightsAndSetsParams{
+		ID:                 uuid.New(),
 		WorkoutExercisesID: exercise.ID,
 		Weight:             25,
 		IsKilograms:        true,
@@ -194,6 +195,8 @@ func createTestWeightSet(t *testing.T, cfg *apiConfig, exercise database.Workout
 			Int32: 90,
 			Valid: true,
 		},
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	})
 	if err != nil {
 		t.Fatalf("failed to create test weight set: %v", err)
@@ -209,4 +212,37 @@ func createTestWeightSet(t *testing.T, cfg *apiConfig, exercise database.Workout
 	})
 
 	return weightSet
+}
+
+func createTestCardioSet(t *testing.T, cfg *apiConfig, exercise database.WorkoutExercise) database.CardioAndSet {
+	t.Helper()
+	cardioSet, err := cfg.db.CreateCardioAndSets(context.Background(), database.CreateCardioAndSetsParams{
+		ID:                 uuid.New(),
+		WorkoutExercisesID: exercise.ID,
+		SetNumber:          5,
+		Distance: sql.NullFloat64{
+			Float64: 20,
+			Valid:   true,
+		},
+		IsKilometers: true,
+		DurationSeconds: sql.NullInt32{
+			Int32: 30,
+			Valid: true,
+		},
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("failed to create test cardio set: %v", err)
+	}
+	t.Cleanup(func() {
+		err := cfg.db.DeleteCardioAndSets(context.Background(), database.DeleteCardioAndSetsParams{
+			ID:                 cardioSet.ID,
+			WorkoutExercisesID: cardioSet.WorkoutExercisesID,
+		})
+		if err != nil {
+			t.Errorf("failed to cleanup cardio set: %v", err)
+		}
+	})
+	return cardioSet
 }

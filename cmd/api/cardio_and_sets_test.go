@@ -9,25 +9,24 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestAuthorizeWeightAndSets_Success(t *testing.T) {
-	x := newWeightSetFixture(t)
-	gotWeightSet, err := x.cfg.authorizeWeightSet(x.ctx, x.weightSet.ID, x.user.ID)
-
+func TestAuthorizeCardioAndSets_Success(t *testing.T) {
+	x := newCardioSetFixture(t)
+	gotCardioSet, err := x.cfg.authorizeCardioSet(x.ctx, x.cardioSet.ID, x.user.ID)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if gotWeightSet.ID != x.weightSet.ID {
-		t.Fatalf("expected weight set ID %v, got %v", x.weightSet.ID, gotWeightSet.ID)
+	if gotCardioSet.ID != x.cardioSet.ID {
+		t.Fatalf("expected cardio ID %v, got %v", x.cardioSet.ID, gotCardioSet.ID)
 	}
-	if gotWeightSet.WorkoutExercisesID != x.weightSet.WorkoutExercisesID {
-		t.Fatalf("expected exercise ID %v, got %v: ", x.weightSet.WorkoutExercisesID, gotWeightSet.WorkoutExercisesID)
+	if gotCardioSet.WorkoutExercisesID != x.cardioSet.WorkoutExercisesID {
+		t.Fatalf("expected exercise ID %v, got %v: ", x.cardioSet.WorkoutExercisesID, gotCardioSet.WorkoutExercisesID)
 	}
 }
 
-func TestAuthorizeWeightAndSets_Forbidden(t *testing.T) {
-	x := newWeightSetFixture(t)
+func TestAuthorizedCardioAndSets_Forbidden(t *testing.T) {
+	x := newCardioSetFixture(t)
 	otherUser := createTestUser(t, x.cfg)
-	_, err := x.cfg.authorizeWeightSet(x.ctx, x.weightSet.ID, otherUser.ID)
+	_, err := x.cfg.authorizeCardioSet(x.ctx, x.cardioSet.ID, otherUser.ID)
 	if err == nil {
 		t.Fatal("expected ErrForbidden, got nil")
 	}
@@ -37,43 +36,42 @@ func TestAuthorizeWeightAndSets_Forbidden(t *testing.T) {
 	}
 }
 
-func TestAuthorizeWeightAndSets_NotFound(t *testing.T) {
-	x := newWeightSetFixture(t)
-	_, err := x.cfg.authorizeWeightSet(x.ctx, uuid.New(), x.user.ID)
+func TestAuthorizedCardioAndSets_NotFound(t *testing.T) {
+	x := newCardioSetFixture(t)
+	_, err := x.cfg.authorizeCardioSet(x.ctx, uuid.New(), x.user.ID)
 	if err == nil {
 		t.Fatal("expected ErrNotFound, got nil")
 	}
-
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
 	}
 }
 
-type weightSetFixture struct {
+type cardioSetFixture struct {
 	ctx        context.Context
 	cfg        *apiConfig
 	user       database.User
 	session    database.WorkoutSession
 	exercise   database.Exercise
 	woExercise database.WorkoutExercise
-	weightSet  database.WeightsAndSet
+	cardioSet  database.CardioAndSet
 }
 
-func newWeightSetFixture(t *testing.T) weightSetFixture {
+func newCardioSetFixture(t *testing.T) cardioSetFixture {
 	t.Helper()
 	cfg := newTestAPIConfig(t)
 	user := createTestUser(t, cfg)
 	session := createTestWorkoutSession(t, cfg, user.ID)
 	exercise := createTestExercise(t, cfg, user.ID)
 	woExercise := createTestWorkoutExercise(t, cfg, session, exercise.ID)
-	weightSet := createTestWeightSet(t, cfg, woExercise)
-	return weightSetFixture{
+	cardioSet := createTestCardioSet(t, cfg, woExercise)
+	return cardioSetFixture{
 		ctx:        context.Background(),
 		cfg:        cfg,
 		user:       user,
 		session:    session,
 		exercise:   exercise,
 		woExercise: woExercise,
-		weightSet:  weightSet,
+		cardioSet:  cardioSet,
 	}
 }
