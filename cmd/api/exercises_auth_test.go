@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// Auth Testing
 func TestAuthorizeExercise_Success(t *testing.T) {
 	x := newExerciseFixture(t)
 	gotExercise, err := x.cfg.authorizeExercise(x.ctx, x.exercise.ID, x.user.ID)
@@ -49,6 +50,7 @@ func TestAuthorizeExercise_NotFound(t *testing.T) {
 	}
 }
 
+// auth test helpers
 type exerciseFixture struct {
 	ctx      context.Context
 	cfg      *apiConfig

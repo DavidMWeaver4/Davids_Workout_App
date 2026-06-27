@@ -16,6 +16,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// auth and setup handlers
 func newTestAPIConfig(t *testing.T) *apiConfig {
 	t.Helper()
 	err := godotenv.Load("../../.env")
@@ -44,7 +45,10 @@ func newTestAPIConfig(t *testing.T) *apiConfig {
 			t.Errorf("failed to close db: %v", err)
 		}
 	})
-	return &apiConfig{db: database.New(db)}
+	return &apiConfig{
+		db:        database.New(db),
+		jwtSecret: "test-secret",
+	}
 }
 
 func createTestUser(t *testing.T, cfg *apiConfig) database.User {
@@ -78,6 +82,7 @@ func createTestHashPassword(t *testing.T, password string) string {
 	return hash
 }
 
+// create test database entries
 func createTestWorkoutSession(t *testing.T, cfg *apiConfig, userID uuid.UUID) database.WorkoutSession {
 	t.Helper()
 	session, err := cfg.db.CreateWorkoutSessions(context.Background(), database.CreateWorkoutSessionsParams{
