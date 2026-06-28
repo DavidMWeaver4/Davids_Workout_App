@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -56,7 +57,7 @@ func createTestUser(t *testing.T, cfg *apiConfig) database.User {
 	hash := createTestHashPassword(t, "testpassword123")
 	user, err := cfg.db.CreateUser(context.Background(), database.CreateUserParams{
 		ID:           uuid.New(),
-		Email:        fmt.Sprintf("%v@test.com", time.Now().UTC()),
+		Email:        fmt.Sprintf("%v@test.com", uuid.New().String()),
 		PasswordHash: hash,
 		CreatedAt:    time.Now().UTC(),
 		UpdatedAt:    time.Now().UTC(),
@@ -66,7 +67,7 @@ func createTestUser(t *testing.T, cfg *apiConfig) database.User {
 	}
 	t.Cleanup(func() {
 		err := cfg.db.DeleteUserByID(context.Background(), user.ID)
-		if err != nil {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("failed to cleanup user: %v", err)
 		}
 	})
@@ -107,7 +108,7 @@ func createTestWorkoutSession(t *testing.T, cfg *apiConfig, userID uuid.UUID) da
 		err := cfg.db.DeleteWorkoutSession(context.Background(), database.DeleteWorkoutSessionParams{
 			ID:     session.ID,
 			UserID: session.UserID})
-		if err != nil {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("cleanup failed: %v", err)
 		}
 	})
@@ -133,7 +134,7 @@ func createTestWorkoutExercise(t *testing.T, cfg *apiConfig, session database.Wo
 			ID:               woExercise.ID,
 			WorkoutSessionID: woExercise.WorkoutSessionID,
 		})
-		if err != nil {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("cleanup failed: %v", err)
 		}
 	})
@@ -174,7 +175,7 @@ func createTestExercise(t *testing.T, cfg *apiConfig, userID uuid.UUID) database
 			ID:     exercise.ID,
 			UserID: exercise.UserID,
 		})
-		if err != nil {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("failed to cleanup exercise: %v", err)
 		}
 	})
@@ -211,7 +212,7 @@ func createTestWeightSet(t *testing.T, cfg *apiConfig, exercise database.Workout
 			ID:                 weightSet.ID,
 			WorkoutExercisesID: weightSet.WorkoutExercisesID,
 		})
-		if err != nil {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("failed to cleanup weight set: %v", err)
 		}
 	})
@@ -245,7 +246,7 @@ func createTestCardioSet(t *testing.T, cfg *apiConfig, exercise database.Workout
 			ID:                 cardioSet.ID,
 			WorkoutExercisesID: cardioSet.WorkoutExercisesID,
 		})
-		if err != nil {
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			t.Errorf("failed to cleanup cardio set: %v", err)
 		}
 	})

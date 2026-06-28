@@ -36,7 +36,7 @@ func TestHandlerCreateExercise_Success(t *testing.T) {
 		Description:     "compound movement",
 	}
 
-	jsonBody := tesingMarshalJSON(t, body)
+	jsonBody := testingMarshalJSON(t, body)
 
 	req := testingCreateAuthenticatedJSONRequest(http.MethodPost, "/api/v1/exercises", jsonBody, token)
 	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerCreateExercises), req)
@@ -73,28 +73,128 @@ func TestHandlerCreateExercise_Success(t *testing.T) {
 }
 
 func TestHandlerDeleteExercise_Success(t *testing.T) {
-	//setup
+
 	cfg := newTestAPIConfig(t)
 	user := createTestUser(t, cfg)
 	token := testingCreateJWT(t, cfg, user.ID)
 
 	exerciseToDelete := createTestExercise(t, cfg, user.ID)
-	//make request
+
 	req := testingCreateAuthenticatedJSONRequest(http.MethodDelete, "/api/v1/exercises/"+exerciseToDelete.ID.String(), nil, token)
 	req.SetPathValue("id", exerciseToDelete.ID.String())
 	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerDeleteExercisesByID), req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
 	}
-	//double check it deletes
+
 	_, err := cfg.db.GetExerciseFromID(context.Background(), exerciseToDelete.ID)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
+func TestHandlerGetExerciseFromID_Success(t *testing.T) {
+	cfg := newTestAPIConfig(t)
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	exerciseToFind := createTestExercise(t, cfg, user.ID)
+	exerciseID := exerciseToFind.ID
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/exercises/"+exerciseID.String(), nil, token)
+	req.SetPathValue("id", exerciseID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerGetExerciseFromID), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	response := testingDecodeJSONResponse[exercise](t, rr)
+	if response.ID != exerciseToFind.ID {
+		t.Fatalf("expected exercise ID %v, to match %v", response.ID, exerciseToFind.ID)
+	}
+}
+
+func TestHandlerSearchExercises_Success(t *testing.T) {
+	cfg := newTestAPIConfig(t)
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	testExercise := createTestExercise(t, cfg, user.ID)
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/exercises/search?muscle=chest&equipment=barbell&difficulty=beginner", nil, token)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerSearchExercises), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	response := testingDecodeJSONResponse[[]exercise](t, rr)
+
+	if len(response) == 0 {
+		t.Fatal("expected at least one exercise")
+	}
+
+	found := false
+	for _, ex := range response {
+		if ex.ID == testExercise.ID {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatal("created exercise was not returned")
+	}
+}
+func TestHandlerUpdateExercise_Success(t *testing.T) {
+	cfg := newTestAPIConfig(t)
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	testExercise := createTestExercise(t, cfg, user.ID)
+	type requestBody struct {
+		ExerciseName    string   `json:"exercise_name"`
+		TargetMuscles   []string `json:"target_muscles"`
+		Equipment       string   `json:"equipment"`
+		DifficultyLevel string   `json:"difficulty_level"`
+		Description     string   `json:"description"`
+	}
+
+	body := requestBody{
+		ExerciseName:    "Bench Press",
+		TargetMuscles:   []string{"chest"},
+		Equipment:       "barbell",
+		DifficultyLevel: "beginner",
+		Description:     "compound movement",
+	}
+
+	jsonBody := testingMarshalJSON(t, body)
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/exercises/"+testExercise.ID.String(), jsonBody, token)
+	req.SetPathValue("id", testExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerUpdateExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	response := testingDecodeJSONResponse[exercise](t, rr)
+
+	dbExercise, err := cfg.db.GetExerciseFromID(context.Background(), response.ID)
+
+	if err != nil {
+		t.Fatal("exercise was not updated in database")
+	}
+
+	if dbExercise.ExerciseName != body.ExerciseName ||
+		dbExercise.Equipment.String != body.Equipment ||
+		dbExercise.Description.String != body.Description ||
+		dbExercise.DifficultyLevel.String != body.DifficultyLevel {
+		t.Fatal("database value does not match")
+	}
+}
+
 // helper funcs
-func tesingMarshalJSON(t *testing.T, v any) []byte {
+func testingMarshalJSON(t *testing.T, v any) []byte {
 	t.Helper()
 
 	data, err := json.Marshal(v)
