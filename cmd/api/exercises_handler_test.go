@@ -2,17 +2,11 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
-	"time"
 
-	"github.com/DavidMWeaver4/Davids_Workout_App/internal/auth"
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
-	"github.com/google/uuid"
 )
 
 func TestHandlerCreateExercise_Success(t *testing.T) {
@@ -68,7 +62,7 @@ func TestHandlerCreateExercise_Success(t *testing.T) {
 	}
 
 	if dbExercise.ExerciseName != body.ExerciseName {
-		t.Fatal("database value does not match")
+		t.Fatal("database value does not match entry data")
 	}
 }
 
@@ -189,52 +183,6 @@ func TestHandlerUpdateExercise_Success(t *testing.T) {
 		dbExercise.Equipment.String != body.Equipment ||
 		dbExercise.Description.String != body.Description ||
 		dbExercise.DifficultyLevel.String != body.DifficultyLevel {
-		t.Fatal("database value does not match")
+		t.Fatal("database value does not match entry data")
 	}
-}
-
-// helper funcs
-func testingMarshalJSON(t *testing.T, v any) []byte {
-	t.Helper()
-
-	data, err := json.Marshal(v)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return data
-}
-func testingExecuteRequest(handler http.HandlerFunc, req *http.Request) *httptest.ResponseRecorder {
-	rr := httptest.NewRecorder()
-	handler.ServeHTTP(rr, req)
-	return rr
-}
-func testingDecodeJSONResponse[T any](t *testing.T, rr *httptest.ResponseRecorder) T {
-	t.Helper()
-
-	var result T
-
-	err := json.NewDecoder(rr.Body).Decode(&result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return result
-}
-func testingCreateJWT(t *testing.T, cfg *apiConfig, userID uuid.UUID) string {
-	t.Helper()
-
-	token, err := auth.MakeJWT(userID, cfg.jwtSecret, time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return token
-}
-func testingCreateAuthenticatedJSONRequest(method string, path string, body []byte, token string) *http.Request {
-	req := httptest.NewRequest(method, path, bytes.NewBuffer(body))
-
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Content-Type", "application/json")
-
-	return req
 }

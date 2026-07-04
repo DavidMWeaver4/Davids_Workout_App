@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -16,6 +20,52 @@ import (
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
+
+// testing helpers
+func testingMarshalJSON(t *testing.T, v any) []byte {
+	t.Helper()
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return data
+}
+func testingExecuteRequest(handler http.HandlerFunc, req *http.Request) *httptest.ResponseRecorder {
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+	return rr
+}
+func testingDecodeJSONResponse[T any](t *testing.T, rr *httptest.ResponseRecorder) T {
+	t.Helper()
+
+	var result T
+
+	err := json.NewDecoder(rr.Body).Decode(&result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+func testingCreateJWT(t *testing.T, cfg *apiConfig, userID uuid.UUID) string {
+	t.Helper()
+
+	token, err := auth.MakeJWT(userID, cfg.jwtSecret, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return token
+}
+func testingCreateAuthenticatedJSONRequest(method string, path string, body []byte, token string) *http.Request {
+	req := httptest.NewRequest(method, path, bytes.NewBuffer(body))
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	return req
+}
 
 // auth and setup handlers
 func newTestAPIConfig(t *testing.T) *apiConfig {
@@ -100,6 +150,36 @@ func createTestWorkoutSession(t *testing.T, cfg *apiConfig, userID uuid.UUID) da
 		},
 		CreatedAt: time.Now().UTC(),
 		UpdatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("failed to create test workout session: %v", err)
+	}
+	t.Cleanup(func() {
+		err := cfg.db.DeleteWorkoutSession(context.Background(), database.DeleteWorkoutSessionParams{
+			ID:     session.ID,
+			UserID: session.UserID})
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("cleanup failed: %v", err)
+		}
+	})
+	return session
+}
+func createTestWorkoutSessionWithDate(t *testing.T, cfg *apiConfig, userID uuid.UUID, date time.Time) database.WorkoutSession {
+	t.Helper()
+	session, err := cfg.db.CreateWorkoutSessions(context.Background(), database.CreateWorkoutSessionsParams{
+		ID:          uuid.New(),
+		UserID:      userID,
+		WorkoutDate: date,
+		Description: sql.NullString{
+			String: "testing",
+			Valid:  true,
+		},
+		Notes: sql.NullString{
+			String: "test",
+			Valid:  true,
+		},
+		CreatedAt: date,
+		UpdatedAt: date,
 	})
 	if err != nil {
 		t.Fatalf("failed to create test workout session: %v", err)
