@@ -194,6 +194,36 @@ func createTestWorkoutSessionWithDate(t *testing.T, cfg *apiConfig, userID uuid.
 	})
 	return session
 }
+func createTestWorkoutSessionWithDescription(t *testing.T, cfg *apiConfig, userID uuid.UUID, desc string) database.WorkoutSession {
+	t.Helper()
+	session, err := cfg.db.CreateWorkoutSessions(context.Background(), database.CreateWorkoutSessionsParams{
+		ID:          uuid.New(),
+		UserID:      userID,
+		WorkoutDate: time.Now().UTC(),
+		Description: sql.NullString{
+			String: desc,
+			Valid:  true,
+		},
+		Notes: sql.NullString{
+			String: "test",
+			Valid:  true,
+		},
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("failed to create test workout session: %v", err)
+	}
+	t.Cleanup(func() {
+		err := cfg.db.DeleteWorkoutSession(context.Background(), database.DeleteWorkoutSessionParams{
+			ID:     session.ID,
+			UserID: session.UserID})
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("cleanup failed: %v", err)
+		}
+	})
+	return session
+}
 
 func createTestWorkoutExercise(t *testing.T, cfg *apiConfig, session database.WorkoutSession, exerciseID uuid.UUID) database.WorkoutExercise {
 	t.Helper()

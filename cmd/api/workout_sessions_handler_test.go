@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"net/http"
+	"net/url"
+	"strconv"
 	"testing"
 	"time"
 
@@ -195,18 +197,139 @@ func TestHandlerGetMyLastSession_Success(t *testing.T) {
 	}
 }
 func TestHandlerGetMyXNumberLastSessions_Success(t *testing.T) {
-	t.Skip()
-	//mux.HandleFunc("GET /api/v1/workout_sessions/last/count/{lastX}", apiCfg.handlerGetMyXNumberLastSessions)
+	cfg := newTestAPIConfig(t)
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	session1 := createTestWorkoutSessionWithDate(t, cfg, user.ID, time.Now().UTC().Add(-24*time.Hour))
+	session2 := createTestWorkoutSessionWithDate(t, cfg, user.ID, time.Now().UTC().Add(-12*time.Hour))
+	session3 := createTestWorkoutSession(t, cfg, user.ID)
+	sessionToNotGet := createTestWorkoutSessionWithDate(t, cfg, user.ID, time.Now().UTC().Add(-128*time.Hour))
+	numberToGet := 3
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/workout_sessions/last/count/3?lastX="+strconv.Itoa(numberToGet), nil, token)
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerGetMyXNumberLastSessions), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	response := testingDecodeJSONResponse[[]workoutSessions](t, rr)
+
+	expectedIDs := map[uuid.UUID]bool{
+		session1.ID: false,
+		session2.ID: false,
+		session3.ID: false,
+	}
+
+	for _, rep := range response {
+		if _, ok := expectedIDs[rep.ID]; ok {
+			expectedIDs[rep.ID] = true
+		}
+		if rep.ID == sessionToNotGet.ID {
+			t.Fatalf("got wrong sessions")
+		}
+	}
+
+	for id, found := range expectedIDs {
+		if !found {
+			t.Fatalf("expected session %v in response, but it was not found", id)
+		}
+	}
 }
+
 func TestHandlerCountSessions_Success(t *testing.T) {
-	t.Skip()
-	//mux.HandleFunc("GET /api/v1/workout_sessions/count/me", apiCfg.handlerCountSessions)
+	cfg := newTestAPIConfig(t)
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	_ = createTestWorkoutSessionWithDate(t, cfg, user.ID, time.Now().UTC().Add(-24*time.Hour))
+	_ = createTestWorkoutSessionWithDate(t, cfg, user.ID, time.Now().UTC().Add(-12*time.Hour))
+	_ = createTestWorkoutSession(t, cfg, user.ID)
+	_ = createTestWorkoutSessionWithDate(t, cfg, user.ID, time.Now().UTC().Add(-128*time.Hour))
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/workout_sessions/count/me", nil, token)
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerCountSessions), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	type countResponse struct {
+		Count int64 `json:"count"`
+	}
+	response := testingDecodeJSONResponse[countResponse](t, rr)
+
+	if response.Count != 4 {
+		t.Fatalf("expected 4, got %d", response.Count)
+	}
+
 }
 func TestHandlerSearchWOSByDescription_Success(t *testing.T) {
-	t.Skip()
-	//mux.HandleFunc("GET /api/v1/workout_sessions/search/desc", apiCfg.handlerSearchWOSByDescription)
+	cfg := newTestAPIConfig(t)
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	session1 := createTestWorkoutSessionWithDescription(t, cfg, user.ID, "first sessions descrip")
+	session2 := createTestWorkoutSessionWithDescription(t, cfg, user.ID, "second sessions descrip")
+	session3 := createTestWorkoutSession(t, cfg, user.ID)
+	sessionToGet := createTestWorkoutSessionWithDescription(t, cfg, user.ID, "Let's match here")
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/workout_sessions/search/desc?query=Let%27s+match", nil, token)
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerSearchWOSByDescription), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	response := testingDecodeJSONResponse[[]workoutSessions](t, rr)
+
+	for _, rep := range response {
+		if rep.ID == session1.ID || rep.ID == session2.ID || rep.ID == session3.ID {
+			t.Fatalf("got unexpected session in results: %v", rep.ID)
+		}
+	}
+	found := false
+	for _, rep := range response {
+		if rep.ID == sessionToGet.ID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected session was not returned")
+	}
 }
 func TestHandlerSearchWOSByDateRange_Sucess(t *testing.T) {
-	t.Skip()
-	//mux.HandleFunc("GET /api/v1/workout_sessions/search/date", apiCfg.handlerSearchWOSByDateRange)
+	cfg := newTestAPIConfig(t)
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	_ = createTestWorkoutSessionWithDate(t, cfg, user.ID, time.Now().UTC().Add(-24*time.Hour))
+	_ = createTestWorkoutSessionWithDate(t, cfg, user.ID, time.Now().UTC().Add(-12*time.Hour))
+	_ = createTestWorkoutSession(t, cfg, user.ID)
+	sessionOutOfRange := createTestWorkoutSessionWithDate(t, cfg, user.ID, time.Now().UTC().Add(-128*time.Hour))
+
+	endTime := time.Now().UTC()
+	startTime := time.Now().UTC().Add(-72 * time.Hour)
+	baseURL := "/api/v1/workout_sessions/search/date"
+	params := url.Values{}
+	params.Add("start", startTime.Format(time.RFC3339))
+	params.Add("end", endTime.Format(time.RFC3339))
+	fullURL := baseURL + "?" + params.Encode()
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, fullURL, nil, token)
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerSearchWOSByDateRange), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	response := testingDecodeJSONResponse[[]workoutSessions](t, rr)
+
+	for _, rep := range response {
+		if rep.WorkoutDate.Before(startTime) || rep.WorkoutDate.After(endTime) {
+			t.Fatalf("session %v has date %v outside expected range", rep.ID, rep.WorkoutDate)
+		}
+		if rep.ID == sessionOutOfRange.ID {
+			t.Fatal("session outside date range was returned")
+		}
+	}
+
 }

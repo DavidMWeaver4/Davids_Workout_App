@@ -187,7 +187,7 @@ func (cfg *apiConfig) handlerGetMyXNumberLastSessions(w http.ResponseWriter, r *
 	if err != nil {
 		return
 	}
-	lastXString := r.URL.Query().Get("lastx")
+	lastXString := r.URL.Query().Get("lastX")
 	if lastXString == "" {
 		respondWithError(w, http.StatusBadRequest, "Missing required query param: lastx", nil)
 		return
