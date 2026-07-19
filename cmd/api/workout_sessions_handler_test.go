@@ -27,9 +27,9 @@ func TestHandlerCreateWorkoutSession_Success(t *testing.T) {
 		Description: "this is a test workout session",
 		Notes:       "test note",
 	}
-	jsonBody := testingMarshalJSON(t, body)
+	JSONBody := testingMarshalJSON(t, body)
 
-	req := testingCreateAuthenticatedJSONRequest(http.MethodPost, "/api/v1/workout_sessions", jsonBody, token)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPost, "/api/v1/workout_sessions", JSONBody, token)
 	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerCreateWorkoutSession), req)
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rr.Code, rr.Body.String())
@@ -44,7 +44,7 @@ func TestHandlerCreateWorkoutSession_Success(t *testing.T) {
 		t.Fatalf("expected %s, got %v", body.Notes, response.Notes)
 	}
 	if response.UserID != user.ID {
-		t.Fatalf("Got wrong user ID, expected %v, got %v", user.ID, response.UserID)
+		t.Fatalf("got wrong user ID, expected %v, got %v", user.ID, response.UserID)
 	}
 	dbWorkoutSession, err := cfg.db.GetWorkoutSessionByID(context.Background(), response.ID)
 	t.Cleanup(func() {
