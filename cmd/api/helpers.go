@@ -71,7 +71,7 @@ func (cfg *apiConfig) authorizeWeightSet(ctx context.Context, weightSetID uuid.U
 }
 func (cfg *apiConfig) authorizeCardioSet(ctx context.Context, cardioSetID uuid.UUID, userID uuid.UUID) (database.CardioAndSet, error) {
 
-	cardioSet, err := cfg.db.GetCardioAndSetFromID(ctx, cardioSetID)
+	cardioSet, err := cfg.db.GetCardioSetFromID(ctx, cardioSetID)
 	if err == sql.ErrNoRows {
 		return database.CardioAndSet{}, ErrNotFound
 	}

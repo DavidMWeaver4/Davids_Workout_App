@@ -39,7 +39,7 @@ func TestHandlerCreateWeightAndSets_Success(t *testing.T) {
 	}
 	JSONBody := testingMarshalJSON(t, body)
 	req := testingCreateAuthenticatedJSONRequest(http.MethodPost, "/api/v1/weights_and_sets", JSONBody, token)
-	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerCreateWeightsAndSets), req)
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerCreateWeightAndSet), req)
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rr.Code, rr.Body.String())
 	}
@@ -58,7 +58,7 @@ func TestHandlerCreateWeightAndSets_Success(t *testing.T) {
 	}
 	dbWeightSet, err := cfg.db.GetWeightAndSetFromID(context.Background(), response.ID)
 	t.Cleanup(func() {
-		cfg.db.DeleteWeightAndSets(context.Background(), database.DeleteWeightAndSetsParams{
+		cfg.db.DeleteWeightAndSet(context.Background(), database.DeleteWeightAndSetParams{
 			ID:                 response.ID,
 			WorkoutExercisesID: WOExecercise.ID,
 		})
@@ -87,7 +87,7 @@ func TestHandlerGetAllSetsFromSession_Success(t *testing.T) {
 
 	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/workout_exercises/"+WOSession.ID.String()+"/sets", nil, token)
 	req.SetPathValue("id", WOSession.ID.String())
-	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerGetAllSetsFromSession), req)
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerGetAllSetsFromExercise), req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
 	}
@@ -105,27 +105,232 @@ func TestHandlerGetAllSetsFromSession_Success(t *testing.T) {
 		t.Fatal("did not find correct sets")
 	}
 }
-func TestHandlerDeleteWeightAndSet_Success(t *testing.T) {
-	t.Skip()
-	//mux.HandleFunc("DELETE /api/v1/weights_and_sets/{id}", apiCfg.handlerDeleteWeightandSet)
-}
-func TestHandlerUpdateWeightAndSet_Success(t *testing.T) {
-	t.Skip()
-	//ux.HandleFunc("PUT /api/v1/weights_and_sets/{id}", apiCfg.handlerUpdateWeightAndSets)
+func TestHandlerGetTotalDuration_Success(t *testing.T) {
+	cfg := newTestAPIConfig(t)
+
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	session := createTestWorkoutSession(t, cfg, user.ID)
+	exercise := createTestExercise(t, cfg, user.ID)
+	woExercise := createTestWorkoutExercise(t, cfg, session, exercise.ID)
+
+	set := createTestWeightSet(t, cfg, woExercise)
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/weights_and_sets/"+set.ID.String()+"/duration", nil, token)
+	req.SetPathValue("id", set.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerGetTotalDuration), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	response := testingDecodeJSONResponse[durationResponse](t, rr)
+	expected := set.DurationSeconds.Int32 + set.RestTimeSeconds.Int32
+
+	if response.TotalSeconds != expected {
+		t.Fatalf("expected duration %d got %d", expected, response.TotalSeconds)
+	}
 }
 func TestHandlerGetVolumeSet_Success(t *testing.T) {
-	t.Skip()
-	//x.HandleFunc("GET /api/v1/weights_and_sets/{id}/volume", apiCfg.handlerGetVolumeSet)
+
+	cfg := newTestAPIConfig(t)
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	session := createTestWorkoutSession(t, cfg, user.ID)
+	exercise := createTestExercise(t, cfg, user.ID)
+	woExercise := createTestWorkoutExercise(t, cfg, session, exercise.ID)
+	weightSet := createTestWeightSet(t, cfg, woExercise)
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/weights_and_sets/"+weightSet.ID.String()+"/volume", nil, token)
+	req.SetPathValue("id", weightSet.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerGetVolumeSet), req)
+	t.Log(rr.Body.String())
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	response := testingDecodeJSONResponse[volumeResponse](t, rr)
+
+	expectedVolume := weightSet.Weight * float64(weightSet.RepsActual)
+
+	if response.Volume != expectedVolume {
+		t.Fatalf("expected %.2f got %.2f", expectedVolume, response.Volume)
+	}
 }
-func TestHandlerGetTotalVolumeFromAllSets_Success(t *testing.T) {
-	t.Skip()
-	//x.HandleFunc("GET /api/v1/weights_and_sets/{id}/volume/all", apiCfg.handlerGetTotalVolumeFromAllSet)
+func TestHandlerGetTotalVolumeFromExerciseSets_Success(t *testing.T) {
+	cfg := newTestAPIConfig(t)
+
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	session := createTestWorkoutSession(t, cfg, user.ID)
+	exercise := createTestExercise(t, cfg, user.ID)
+	woExercise := createTestWorkoutExercise(t, cfg, session, exercise.ID)
+
+	set1 := createTestWeightSet(t, cfg, woExercise)
+	set2 := createTestWeightSet(t, cfg, woExercise)
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/weights_and_sets/"+set1.ID.String()+"/volume/all", nil, token)
+	req.SetPathValue("id", set1.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerGetTotalVolumeFromExerciseSets), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	response := testingDecodeJSONResponse[volumeResponse](t, rr)
+
+	expected := (set1.Weight * float64(set1.RepsActual)) + (set2.Weight * float64(set2.RepsActual))
+
+	if response.Volume != expected {
+		t.Fatalf("expected volume %.2f got %.2f", expected, response.Volume)
+	}
 }
-func TestHandlerGetTotalDuration_Success(t *testing.T) {
-	t.Skip()
-	//x.HandleFunc("GET /api/v1/weights_and_sets/{id}/duration", apiCfg.handlerGetTotalDuration)
+func TestHandlerGetTotalSessionVolume_Success(t *testing.T) {
+	cfg := newTestAPIConfig(t)
+
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	session := createTestWorkoutSession(t, cfg, user.ID)
+
+	exercise1 := createTestExercise(t, cfg, user.ID)
+	exercise2 := createTestExercise(t, cfg, user.ID)
+
+	woExercise1 := createTestWorkoutExercise(t, cfg, session, exercise1.ID)
+	woExercise2 := createTestWorkoutExercise(t, cfg, session, exercise2.ID)
+
+	set1 := createTestWeightSet(t, cfg, woExercise1)
+	set2 := createTestWeightSet(t, cfg, woExercise2)
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/workout_sessions/"+session.ID.String()+"/volume", nil, token)
+	req.SetPathValue("id", session.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerGetTotalSessionVolume), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	response := testingDecodeJSONResponse[volumeResponse](t, rr)
+
+	expected := (set1.Weight * float64(set1.RepsActual)) + (set2.Weight * float64(set2.RepsActual))
+
+	if response.Volume != expected {
+		t.Fatalf("expected volume %.2f got %.2f", expected, response.Volume)
+	}
 }
-func TestHandlerGetTotalDurationFromAllSets_Success(t *testing.T) {
-	t.Skip()
-	//x.HandleFunc("GET /api/v1/weights_and_sets/{id}/duration/all", apiCfg.handlerGetTotalDurationFromAllSets)
+func TestHandlerGetTotalDurationForExercise_Success(t *testing.T) {
+	cfg := newTestAPIConfig(t)
+
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	session := createTestWorkoutSession(t, cfg, user.ID)
+	exercise := createTestExercise(t, cfg, user.ID)
+	woExercise := createTestWorkoutExercise(t, cfg, session, exercise.ID)
+
+	set1 := createTestWeightSet(t, cfg, woExercise)
+	set2 := createTestWeightSet(t, cfg, woExercise)
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/weights_and_sets/"+set1.ID.String()+"/duration/all", nil, token)
+	req.SetPathValue("id", set1.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerGetTotalDurationForExercise), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	response := testingDecodeJSONResponse[durationResponse](t, rr)
+
+	expected := set1.DurationSeconds.Int32 + set1.RestTimeSeconds.Int32 + set2.DurationSeconds.Int32 + set2.RestTimeSeconds.Int32
+
+	if response.TotalSeconds != expected {
+		t.Fatalf("expected duration %d got %d", expected, response.TotalSeconds)
+	}
+}
+func TestHandlerUpdateWeightAndSet_Success(t *testing.T) {
+	cfg := newTestAPIConfig(t)
+
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	session := createTestWorkoutSession(t, cfg, user.ID)
+	exercise := createTestExercise(t, cfg, user.ID)
+	woExercise := createTestWorkoutExercise(t, cfg, session, exercise.ID)
+
+	set := createTestWeightSet(t, cfg, woExercise)
+
+	type requestBody struct {
+		Weight          float64 `json:"weight"`
+		IsKilograms     bool    `json:"is_kilogram"`
+		SetNumber       int32   `json:"set_number"`
+		RepsTarget      int32   `json:"reps_target"`
+		RepsActual      int32   `json:"reps_actual"`
+		DurationSeconds int32   `json:"duration_seconds"`
+		RestTimeSeconds int32   `json:"rest_time_seconds"`
+	}
+
+	body := requestBody{
+		Weight:          100,
+		IsKilograms:     true,
+		SetNumber:       5,
+		RepsTarget:      8,
+		RepsActual:      8,
+		DurationSeconds: 60,
+		RestTimeSeconds: 120,
+	}
+
+	jsonBody := testingMarshalJSON(t, body)
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/weights_and_sets/"+set.ID.String(), jsonBody, token)
+	req.SetPathValue("id", set.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerUpdateWeightAndSet), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	response := testingDecodeJSONResponse[weightAndSets](t, rr)
+
+	if response.Weight != body.Weight {
+		t.Fatalf("expected weight %.2f got %.2f", body.Weight, response.Weight)
+	}
+
+	dbSet, err := cfg.db.GetWeightAndSetFromID(context.Background(), set.ID)
+
+	if err != nil {
+		t.Fatal("failed retrieving updated set")
+	}
+
+	if dbSet.RepsActual != body.RepsActual {
+		t.Fatal("database was not updated")
+	}
+}
+func TestHandlerDeleteWeightAndSet_Success(t *testing.T) {
+	cfg := newTestAPIConfig(t)
+
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+
+	session := createTestWorkoutSession(t, cfg, user.ID)
+	exercise := createTestExercise(t, cfg, user.ID)
+	woExercise := createTestWorkoutExercise(t, cfg, session, exercise.ID)
+
+	set := createTestWeightSet(t, cfg, woExercise)
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodDelete, "/api/v1/weights_and_sets/"+set.ID.String(), nil, token)
+	req.SetPathValue("id", set.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerDeleteWeightAndSet), req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	_, err := cfg.db.GetWeightAndSetFromID(context.Background(), set.ID)
+
+	if err == nil {
+		t.Fatal("expected weight set to be deleted")
+	}
 }

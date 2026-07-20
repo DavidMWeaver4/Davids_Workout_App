@@ -1,4 +1,4 @@
--- name: CreateCardioAndSets :one
+-- name: CreateCardioSet :one
 INSERT INTO cardio_and_sets(id, workout_exercises_id, set_number, distance, is_kilometers, duration_seconds, created_at, updated_at)
 VALUES(
     $1,
@@ -12,11 +12,11 @@ VALUES(
 )
 RETURNING *;
 
--- name: GetCardioAndSetFromID :one
+-- name: GetCardioSetFromID :one
 SELECT * FROM cardio_and_sets
 WHERE id = $1;
 
--- name: GetAllCardioFromSession :many
+-- name: GetAllCardioFromExercise :many
 SELECT * FROM cardio_and_sets
 WHERE workout_exercises_id = $1;
 
@@ -25,22 +25,24 @@ SELECT distance FROM cardio_and_sets
 WHERE id = $1 AND workout_exercises_id = $2;
 
 -- name: GetAllSetsDistance :one
-SELECT SUM(distance) FROM cardio_and_sets
+SELECT COALESCE(SUM(distance), 0)::float8
+FROM cardio_and_sets
 WHERE workout_exercises_id = $1;
 
--- name: GetSetDuration :one
+-- name: GetCardioSetDuration :one
 SELECT duration_seconds FROM cardio_and_sets
 WHERE id = $1 AND workout_exercises_id = $2;
 
--- name: GetAllSetsDuration :one
-SELECT SUM(duration_seconds) FROM cardio_and_sets
+-- name: GetAllCardioSetsDuration :one
+SELECT COALESCE(SUM(duration_seconds),0)::bigint
+FROM cardio_and_sets
 WHERE workout_exercises_id = $1;
 
--- name: DeleteCardioAndSets :exec
+-- name: DeleteCardioSet :exec
 DELETE FROM cardio_and_sets
 WHERE id = $1 AND workout_exercises_id = $2;
 
--- name: UpdateCardioAndSets :one
+-- name: UpdateCardioSet :one
 UPDATE cardio_and_sets
 SET
     set_number = $1,
@@ -50,3 +52,25 @@ SET
     updated_at = NOW()
 WHERE id = $5 AND workout_exercises_id = $6
 RETURNING *;
+
+-- name: GetAllCardioSetsFromSession :many
+SELECT cardio_and_sets.*
+FROM cardio_and_sets
+JOIN workout_exercises
+ON cardio_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1
+ORDER BY workout_exercises.order_index, cardio_and_sets.set_number;
+
+-- name: GetTotalSessionCardioDuration :one
+SELECT COALESCE(SUM(cardio_and_sets.duration_seconds), 0)::bigint
+FROM cardio_and_sets
+JOIN workout_exercises
+ON cardio_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1;
+
+-- name: GetTotalSessionDistance :one
+SELECT COALESCE(SUM(cardio_and_sets.distance), 0)::float8
+FROM cardio_and_sets
+JOIN workout_exercises
+ON cardio_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1;

@@ -37,7 +37,7 @@ func TestAuthorizeWeightAndSets_Forbidden(t *testing.T) {
 	}
 }
 
-func TestAuthorizeWeightAndSets_NotFound(t *testing.T) {
+func TestAuthorizeWeightAndSet_NotFound(t *testing.T) {
 	x := newWeightSetFixture(t)
 	_, err := x.cfg.authorizeWeightSet(x.ctx, uuid.New(), x.user.ID)
 	if err == nil {

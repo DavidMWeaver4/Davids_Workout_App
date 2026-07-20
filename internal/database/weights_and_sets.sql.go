@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const createWeightsAndSets = `-- name: CreateWeightsAndSets :one
+const createWeightAndSet = `-- name: CreateWeightAndSet :one
 INSERT INTO weights_and_sets(id, workout_exercises_id, weight, is_kilograms, set_number, reps_target, reps_actual, duration_seconds, rest_time_seconds, created_at, updated_at)
 VALUES(
     $1,
@@ -31,7 +31,7 @@ VALUES(
 RETURNING id, workout_exercises_id, weight, is_kilograms, set_number, reps_target, reps_actual, duration_seconds, rest_time_seconds, created_at, updated_at
 `
 
-type CreateWeightsAndSetsParams struct {
+type CreateWeightAndSetParams struct {
 	ID                 uuid.UUID
 	WorkoutExercisesID uuid.UUID
 	Weight             float64
@@ -45,8 +45,8 @@ type CreateWeightsAndSetsParams struct {
 	UpdatedAt          time.Time
 }
 
-func (q *Queries) CreateWeightsAndSets(ctx context.Context, arg CreateWeightsAndSetsParams) (WeightsAndSet, error) {
-	row := q.db.QueryRowContext(ctx, createWeightsAndSets,
+func (q *Queries) CreateWeightAndSet(ctx context.Context, arg CreateWeightAndSetParams) (WeightsAndSet, error) {
+	row := q.db.QueryRowContext(ctx, createWeightAndSet,
 		arg.ID,
 		arg.WorkoutExercisesID,
 		arg.Weight,
@@ -76,28 +76,72 @@ func (q *Queries) CreateWeightsAndSets(ctx context.Context, arg CreateWeightsAnd
 	return i, err
 }
 
-const deleteWeightAndSets = `-- name: DeleteWeightAndSets :exec
+const deleteWeightAndSet = `-- name: DeleteWeightAndSet :exec
 DELETE FROM weights_and_sets
 WHERE id = $1 AND workout_exercises_id = $2
 `
 
-type DeleteWeightAndSetsParams struct {
+type DeleteWeightAndSetParams struct {
 	ID                 uuid.UUID
 	WorkoutExercisesID uuid.UUID
 }
 
-func (q *Queries) DeleteWeightAndSets(ctx context.Context, arg DeleteWeightAndSetsParams) error {
-	_, err := q.db.ExecContext(ctx, deleteWeightAndSets, arg.ID, arg.WorkoutExercisesID)
+func (q *Queries) DeleteWeightAndSet(ctx context.Context, arg DeleteWeightAndSetParams) error {
+	_, err := q.db.ExecContext(ctx, deleteWeightAndSet, arg.ID, arg.WorkoutExercisesID)
 	return err
 }
 
-const getAllSetsFromSession = `-- name: GetAllSetsFromSession :many
+const getAllSetsFromExercise = `-- name: GetAllSetsFromExercise :many
 SELECT id, workout_exercises_id, weight, is_kilograms, set_number, reps_target, reps_actual, duration_seconds, rest_time_seconds, created_at, updated_at FROM weights_and_sets
 WHERE workout_exercises_id = $1
 `
 
-func (q *Queries) GetAllSetsFromSession(ctx context.Context, workoutExercisesID uuid.UUID) ([]WeightsAndSet, error) {
-	rows, err := q.db.QueryContext(ctx, getAllSetsFromSession, workoutExercisesID)
+func (q *Queries) GetAllSetsFromExercise(ctx context.Context, workoutExercisesID uuid.UUID) ([]WeightsAndSet, error) {
+	rows, err := q.db.QueryContext(ctx, getAllSetsFromExercise, workoutExercisesID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WeightsAndSet
+	for rows.Next() {
+		var i WeightsAndSet
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkoutExercisesID,
+			&i.Weight,
+			&i.IsKilograms,
+			&i.SetNumber,
+			&i.RepsTarget,
+			&i.RepsActual,
+			&i.DurationSeconds,
+			&i.RestTimeSeconds,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllWeightSetsFromSession = `-- name: GetAllWeightSetsFromSession :many
+SELECT weights_and_sets.id, weights_and_sets.workout_exercises_id, weights_and_sets.weight, weights_and_sets.is_kilograms, weights_and_sets.set_number, weights_and_sets.reps_target, weights_and_sets.reps_actual, weights_and_sets.duration_seconds, weights_and_sets.rest_time_seconds, weights_and_sets.created_at, weights_and_sets.updated_at
+FROM weights_and_sets
+JOIN workout_exercises
+ON weights_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1
+ORDER BY workout_exercises.order_index, weights_and_sets.set_number
+`
+
+func (q *Queries) GetAllWeightSetsFromSession(ctx context.Context, workoutSessionID uuid.UUID) ([]WeightsAndSet, error) {
+	rows, err := q.db.QueryContext(ctx, getAllWeightSetsFromSession, workoutSessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +176,8 @@ func (q *Queries) GetAllSetsFromSession(ctx context.Context, workoutExercisesID 
 }
 
 const getSetVolume = `-- name: GetSetVolume :one
-SELECT (reps_actual * weight)::float8 FROM weights_and_sets
+SELECT COALESCE(reps_actual * weight, 0)::float8
+FROM weights_and_sets
 WHERE id = $1 AND workout_exercises_id = $2
 `
 
@@ -165,25 +210,55 @@ func (q *Queries) GetTotalDuration(ctx context.Context, arg GetTotalDurationPara
 	return column_1, err
 }
 
-const getTotalDurationForAllSets = `-- name: GetTotalDurationForAllSets :one
+const getTotalDurationForExercise = `-- name: GetTotalDurationForExercise :one
 SELECT COALESCE(SUM(COALESCE(duration_seconds, 0) + COALESCE(rest_time_seconds, 0)), 0)::int4 FROM weights_and_sets
 WHERE workout_exercises_id = $1
 `
 
-func (q *Queries) GetTotalDurationForAllSets(ctx context.Context, workoutExercisesID uuid.UUID) (int32, error) {
-	row := q.db.QueryRowContext(ctx, getTotalDurationForAllSets, workoutExercisesID)
+func (q *Queries) GetTotalDurationForExercise(ctx context.Context, workoutExercisesID uuid.UUID) (int32, error) {
+	row := q.db.QueryRowContext(ctx, getTotalDurationForExercise, workoutExercisesID)
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
 }
 
-const getTotalVolumeFromAllSets = `-- name: GetTotalVolumeFromAllSets :one
+const getTotalSessionDuration = `-- name: GetTotalSessionDuration :one
+SELECT COALESCE(SUM(COALESCE(duration_seconds,0) + COALESCE(rest_time_seconds,0)), 0)::int4
+FROM weights_and_sets
+JOIN workout_exercises
+ON weights_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1
+`
+
+func (q *Queries) GetTotalSessionDuration(ctx context.Context, workoutSessionID uuid.UUID) (int32, error) {
+	row := q.db.QueryRowContext(ctx, getTotalSessionDuration, workoutSessionID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const getTotalSessionVolume = `-- name: GetTotalSessionVolume :one
+SELECT COALESCE(SUM(weights_and_sets.weight * weights_and_sets.reps_actual), 0)::float8
+FROM weights_and_sets
+JOIN workout_exercises
+ON weights_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1
+`
+
+func (q *Queries) GetTotalSessionVolume(ctx context.Context, workoutSessionID uuid.UUID) (float64, error) {
+	row := q.db.QueryRowContext(ctx, getTotalSessionVolume, workoutSessionID)
+	var column_1 float64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const getTotalVolumeFromExerciseSets = `-- name: GetTotalVolumeFromExerciseSets :one
 SELECT COALESCE(SUM(reps_actual * weight), 0)::float8 FROM weights_and_sets
 WHERE workout_exercises_id = $1
 `
 
-func (q *Queries) GetTotalVolumeFromAllSets(ctx context.Context, workoutExercisesID uuid.UUID) (float64, error) {
-	row := q.db.QueryRowContext(ctx, getTotalVolumeFromAllSets, workoutExercisesID)
+func (q *Queries) GetTotalVolumeFromExerciseSets(ctx context.Context, workoutExercisesID uuid.UUID) (float64, error) {
+	row := q.db.QueryRowContext(ctx, getTotalVolumeFromExerciseSets, workoutExercisesID)
 	var column_1 float64
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -213,7 +288,7 @@ func (q *Queries) GetWeightAndSetFromID(ctx context.Context, id uuid.UUID) (Weig
 	return i, err
 }
 
-const updateWeightsAndSets = `-- name: UpdateWeightsAndSets :one
+const updateWeightAndSet = `-- name: UpdateWeightAndSet :one
 UPDATE weights_and_sets
 SET
     weight = $1,
@@ -228,7 +303,7 @@ WHERE id = $8 AND workout_exercises_id = $9
 RETURNING id, workout_exercises_id, weight, is_kilograms, set_number, reps_target, reps_actual, duration_seconds, rest_time_seconds, created_at, updated_at
 `
 
-type UpdateWeightsAndSetsParams struct {
+type UpdateWeightAndSetParams struct {
 	Weight             float64
 	IsKilograms        bool
 	SetNumber          int32
@@ -240,8 +315,8 @@ type UpdateWeightsAndSetsParams struct {
 	WorkoutExercisesID uuid.UUID
 }
 
-func (q *Queries) UpdateWeightsAndSets(ctx context.Context, arg UpdateWeightsAndSetsParams) (WeightsAndSet, error) {
-	row := q.db.QueryRowContext(ctx, updateWeightsAndSets,
+func (q *Queries) UpdateWeightAndSet(ctx context.Context, arg UpdateWeightAndSetParams) (WeightsAndSet, error) {
+	row := q.db.QueryRowContext(ctx, updateWeightAndSet,
 		arg.Weight,
 		arg.IsKilograms,
 		arg.SetNumber,

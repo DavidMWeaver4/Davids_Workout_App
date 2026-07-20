@@ -18,7 +18,7 @@ type durationResponse struct {
 	TotalSeconds int32 `json:"total_seconds"`
 }
 
-func (cfg *apiConfig) handlerCreateWeightsAndSets(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerCreateWeightAndSet(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
@@ -50,7 +50,7 @@ func (cfg *apiConfig) handlerCreateWeightsAndSets(w http.ResponseWriter, r *http
 		respondWithError(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	weightSet, err := cfg.db.CreateWeightsAndSets(r.Context(), database.CreateWeightsAndSetsParams{
+	weightSet, err := cfg.db.CreateWeightAndSet(r.Context(), database.CreateWeightAndSetParams{
 		WorkoutExercisesID: params.WorkoutExercisesID,
 		Weight:             params.Weight,
 		IsKilograms:        params.IsKilogram,
@@ -73,14 +73,14 @@ func (cfg *apiConfig) handlerCreateWeightsAndSets(w http.ResponseWriter, r *http
 	respondWithJSON(w, http.StatusCreated, weightSetResponse(weightSet))
 }
 
-func (cfg *apiConfig) handlerGetAllSetsFromSession(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerGetAllSetsFromExercise(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
 	}
 	workoutExerciseID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid workout exerciseID", err)
 		return
 	}
 	_, err = cfg.authorizeWorkoutExercise(r.Context(), workoutExerciseID, userID)
@@ -88,9 +88,9 @@ func (cfg *apiConfig) handlerGetAllSetsFromSession(w http.ResponseWriter, r *htt
 		respondWithAuthError(w, err)
 		return
 	}
-	setsInSession, err := cfg.db.GetAllSetsFromSession(r.Context(), workoutExerciseID)
+	setsInSession, err := cfg.db.GetAllSetsFromExercise(r.Context(), workoutExerciseID)
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve workout session", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve workout exercise", err)
 		return
 	}
 	response := make([]weightAndSets, 0)
@@ -100,7 +100,7 @@ func (cfg *apiConfig) handlerGetAllSetsFromSession(w http.ResponseWriter, r *htt
 	respondWithJSON(w, http.StatusOK, response)
 }
 
-func (cfg *apiConfig) handlerDeleteWeightandSet(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerDeleteWeightAndSet(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
@@ -116,7 +116,7 @@ func (cfg *apiConfig) handlerDeleteWeightandSet(w http.ResponseWriter, r *http.R
 		respondWithAuthError(w, err)
 		return
 	}
-	err = cfg.db.DeleteWeightAndSets(r.Context(), database.DeleteWeightAndSetsParams{
+	err = cfg.db.DeleteWeightAndSet(r.Context(), database.DeleteWeightAndSetParams{
 		ID:                 weightSet.ID,
 		WorkoutExercisesID: weightSet.WorkoutExercisesID,
 	})
@@ -127,7 +127,7 @@ func (cfg *apiConfig) handlerDeleteWeightandSet(w http.ResponseWriter, r *http.R
 	respondWithJSON(w, http.StatusOK, msgResponse{"Deletion successful"})
 }
 
-func (cfg *apiConfig) handlerUpdateWeightAndSets(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerUpdateWeightAndSet(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
@@ -164,7 +164,7 @@ func (cfg *apiConfig) handlerUpdateWeightAndSets(w http.ResponseWriter, r *http.
 		respondWithError(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	updatedSet, err := cfg.db.UpdateWeightsAndSets(r.Context(), database.UpdateWeightsAndSetsParams{
+	updatedSet, err := cfg.db.UpdateWeightAndSet(r.Context(), database.UpdateWeightAndSetParams{
 		Weight:      params.Weight,
 		IsKilograms: params.IsKilograms,
 		SetNumber:   params.SetNumber,
@@ -213,7 +213,8 @@ func (cfg *apiConfig) handlerGetVolumeSet(w http.ResponseWriter, r *http.Request
 	}
 	respondWithJSON(w, http.StatusOK, volumeResponse{Volume: float64(setVolume)})
 }
-func (cfg *apiConfig) handlerGetTotalVolumeFromAllSet(w http.ResponseWriter, r *http.Request) {
+
+func (cfg *apiConfig) handlerGetTotalVolumeFromExerciseSets(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
@@ -228,7 +229,7 @@ func (cfg *apiConfig) handlerGetTotalVolumeFromAllSet(w http.ResponseWriter, r *
 		respondWithAuthError(w, err)
 		return
 	}
-	setVolume, err := cfg.db.GetTotalVolumeFromAllSets(r.Context(), weightSet.WorkoutExercisesID)
+	setVolume, err := cfg.db.GetTotalVolumeFromExerciseSets(r.Context(), weightSet.WorkoutExercisesID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to get volume", err)
 		return
@@ -262,7 +263,7 @@ func (cfg *apiConfig) handlerGetTotalDuration(w http.ResponseWriter, r *http.Req
 	respondWithJSON(w, http.StatusOK, durationResponse{TotalSeconds: totalDuration})
 }
 
-func (cfg *apiConfig) handlerGetTotalDurationFromAllSets(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerGetTotalDurationForExercise(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
@@ -277,12 +278,71 @@ func (cfg *apiConfig) handlerGetTotalDurationFromAllSets(w http.ResponseWriter, 
 		respondWithAuthError(w, err)
 		return
 	}
-	totalDuration, err := cfg.db.GetTotalDurationForAllSets(r.Context(), weightSet.WorkoutExercisesID)
+	totalDuration, err := cfg.db.GetTotalDurationForExercise(r.Context(), weightSet.WorkoutExercisesID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to get duration", err)
 		return
 	}
 	respondWithJSON(w, http.StatusOK, durationResponse{TotalSeconds: totalDuration})
+}
+func (cfg *apiConfig) handlerGetAllSetsFromSession(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+
+	sessionID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		return
+	}
+
+	_, err = cfg.authorizeWorkoutSession(r.Context(), sessionID, userID)
+	if err != nil {
+		respondWithAuthError(w, err)
+		return
+	}
+
+	sets, err := cfg.db.GetAllWeightSetsFromSession(r.Context(), sessionID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "failed to retrieve sets", err)
+		return
+	}
+
+	response := make([]weightAndSets, 0, len(sets))
+	for _, s := range sets {
+		response = append(response, weightSetResponse(s))
+	}
+
+	respondWithJSON(w, http.StatusOK, response)
+}
+func (cfg *apiConfig) handlerGetTotalSessionVolume(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+
+	sessionID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		return
+	}
+
+	_, err = cfg.authorizeWorkoutSession(r.Context(), sessionID, userID)
+	if err != nil {
+		respondWithAuthError(w, err)
+		return
+	}
+
+	volume, err := cfg.db.GetTotalSessionVolume(r.Context(), sessionID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get session volume", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, volumeResponse{
+		Volume: volume,
+	})
 }
 
 /*

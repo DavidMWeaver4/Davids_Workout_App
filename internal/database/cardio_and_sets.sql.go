@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const createCardioAndSets = `-- name: CreateCardioAndSets :one
+const createCardioSet = `-- name: CreateCardioSet :one
 INSERT INTO cardio_and_sets(id, workout_exercises_id, set_number, distance, is_kilometers, duration_seconds, created_at, updated_at)
 VALUES(
     $1,
@@ -28,7 +28,7 @@ VALUES(
 RETURNING id, workout_exercises_id, set_number, distance, is_kilometers, duration_seconds, created_at, updated_at
 `
 
-type CreateCardioAndSetsParams struct {
+type CreateCardioSetParams struct {
 	ID                 uuid.UUID
 	WorkoutExercisesID uuid.UUID
 	SetNumber          int32
@@ -39,8 +39,8 @@ type CreateCardioAndSetsParams struct {
 	UpdatedAt          time.Time
 }
 
-func (q *Queries) CreateCardioAndSets(ctx context.Context, arg CreateCardioAndSetsParams) (CardioAndSet, error) {
-	row := q.db.QueryRowContext(ctx, createCardioAndSets,
+func (q *Queries) CreateCardioSet(ctx context.Context, arg CreateCardioSetParams) (CardioAndSet, error) {
+	row := q.db.QueryRowContext(ctx, createCardioSet,
 		arg.ID,
 		arg.WorkoutExercisesID,
 		arg.SetNumber,
@@ -64,28 +64,82 @@ func (q *Queries) CreateCardioAndSets(ctx context.Context, arg CreateCardioAndSe
 	return i, err
 }
 
-const deleteCardioAndSets = `-- name: DeleteCardioAndSets :exec
+const deleteCardioSet = `-- name: DeleteCardioSet :exec
 DELETE FROM cardio_and_sets
 WHERE id = $1 AND workout_exercises_id = $2
 `
 
-type DeleteCardioAndSetsParams struct {
+type DeleteCardioSetParams struct {
 	ID                 uuid.UUID
 	WorkoutExercisesID uuid.UUID
 }
 
-func (q *Queries) DeleteCardioAndSets(ctx context.Context, arg DeleteCardioAndSetsParams) error {
-	_, err := q.db.ExecContext(ctx, deleteCardioAndSets, arg.ID, arg.WorkoutExercisesID)
+func (q *Queries) DeleteCardioSet(ctx context.Context, arg DeleteCardioSetParams) error {
+	_, err := q.db.ExecContext(ctx, deleteCardioSet, arg.ID, arg.WorkoutExercisesID)
 	return err
 }
 
-const getAllCardioFromSession = `-- name: GetAllCardioFromSession :many
+const getAllCardioFromExercise = `-- name: GetAllCardioFromExercise :many
 SELECT id, workout_exercises_id, set_number, distance, is_kilometers, duration_seconds, created_at, updated_at FROM cardio_and_sets
 WHERE workout_exercises_id = $1
 `
 
-func (q *Queries) GetAllCardioFromSession(ctx context.Context, workoutExercisesID uuid.UUID) ([]CardioAndSet, error) {
-	rows, err := q.db.QueryContext(ctx, getAllCardioFromSession, workoutExercisesID)
+func (q *Queries) GetAllCardioFromExercise(ctx context.Context, workoutExercisesID uuid.UUID) ([]CardioAndSet, error) {
+	rows, err := q.db.QueryContext(ctx, getAllCardioFromExercise, workoutExercisesID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CardioAndSet
+	for rows.Next() {
+		var i CardioAndSet
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkoutExercisesID,
+			&i.SetNumber,
+			&i.Distance,
+			&i.IsKilometers,
+			&i.DurationSeconds,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getAllCardioSetsDuration = `-- name: GetAllCardioSetsDuration :one
+SELECT COALESCE(SUM(duration_seconds),0)::bigint
+FROM cardio_and_sets
+WHERE workout_exercises_id = $1
+`
+
+func (q *Queries) GetAllCardioSetsDuration(ctx context.Context, workoutExercisesID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getAllCardioSetsDuration, workoutExercisesID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const getAllCardioSetsFromSession = `-- name: GetAllCardioSetsFromSession :many
+SELECT cardio_and_sets.id, cardio_and_sets.workout_exercises_id, cardio_and_sets.set_number, cardio_and_sets.distance, cardio_and_sets.is_kilometers, cardio_and_sets.duration_seconds, cardio_and_sets.created_at, cardio_and_sets.updated_at
+FROM cardio_and_sets
+JOIN workout_exercises
+ON cardio_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1
+ORDER BY workout_exercises.order_index, cardio_and_sets.set_number
+`
+
+func (q *Queries) GetAllCardioSetsFromSession(ctx context.Context, workoutSessionID uuid.UUID) ([]CardioAndSet, error) {
+	rows, err := q.db.QueryContext(ctx, getAllCardioSetsFromSession, workoutSessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -117,36 +171,42 @@ func (q *Queries) GetAllCardioFromSession(ctx context.Context, workoutExercisesI
 }
 
 const getAllSetsDistance = `-- name: GetAllSetsDistance :one
-SELECT SUM(distance) FROM cardio_and_sets
+SELECT COALESCE(SUM(distance), 0)::float8
+FROM cardio_and_sets
 WHERE workout_exercises_id = $1
 `
 
-func (q *Queries) GetAllSetsDistance(ctx context.Context, workoutExercisesID uuid.UUID) (int64, error) {
+func (q *Queries) GetAllSetsDistance(ctx context.Context, workoutExercisesID uuid.UUID) (float64, error) {
 	row := q.db.QueryRowContext(ctx, getAllSetsDistance, workoutExercisesID)
-	var sum int64
-	err := row.Scan(&sum)
-	return sum, err
+	var column_1 float64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
-const getAllSetsDuration = `-- name: GetAllSetsDuration :one
-SELECT SUM(duration_seconds) FROM cardio_and_sets
-WHERE workout_exercises_id = $1
+const getCardioSetDuration = `-- name: GetCardioSetDuration :one
+SELECT duration_seconds FROM cardio_and_sets
+WHERE id = $1 AND workout_exercises_id = $2
 `
 
-func (q *Queries) GetAllSetsDuration(ctx context.Context, workoutExercisesID uuid.UUID) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getAllSetsDuration, workoutExercisesID)
-	var sum int64
-	err := row.Scan(&sum)
-	return sum, err
+type GetCardioSetDurationParams struct {
+	ID                 uuid.UUID
+	WorkoutExercisesID uuid.UUID
 }
 
-const getCardioAndSetFromID = `-- name: GetCardioAndSetFromID :one
+func (q *Queries) GetCardioSetDuration(ctx context.Context, arg GetCardioSetDurationParams) (sql.NullInt32, error) {
+	row := q.db.QueryRowContext(ctx, getCardioSetDuration, arg.ID, arg.WorkoutExercisesID)
+	var duration_seconds sql.NullInt32
+	err := row.Scan(&duration_seconds)
+	return duration_seconds, err
+}
+
+const getCardioSetFromID = `-- name: GetCardioSetFromID :one
 SELECT id, workout_exercises_id, set_number, distance, is_kilometers, duration_seconds, created_at, updated_at FROM cardio_and_sets
 WHERE id = $1
 `
 
-func (q *Queries) GetCardioAndSetFromID(ctx context.Context, id uuid.UUID) (CardioAndSet, error) {
-	row := q.db.QueryRowContext(ctx, getCardioAndSetFromID, id)
+func (q *Queries) GetCardioSetFromID(ctx context.Context, id uuid.UUID) (CardioAndSet, error) {
+	row := q.db.QueryRowContext(ctx, getCardioSetFromID, id)
 	var i CardioAndSet
 	err := row.Scan(
 		&i.ID,
@@ -178,24 +238,37 @@ func (q *Queries) GetSetDistance(ctx context.Context, arg GetSetDistanceParams) 
 	return distance, err
 }
 
-const getSetDuration = `-- name: GetSetDuration :one
-SELECT duration_seconds FROM cardio_and_sets
-WHERE id = $1 AND workout_exercises_id = $2
+const getTotalSessionCardioDuration = `-- name: GetTotalSessionCardioDuration :one
+SELECT COALESCE(SUM(cardio_and_sets.duration_seconds), 0)::bigint
+FROM cardio_and_sets
+JOIN workout_exercises
+ON cardio_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1
 `
 
-type GetSetDurationParams struct {
-	ID                 uuid.UUID
-	WorkoutExercisesID uuid.UUID
+func (q *Queries) GetTotalSessionCardioDuration(ctx context.Context, workoutSessionID uuid.UUID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getTotalSessionCardioDuration, workoutSessionID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
-func (q *Queries) GetSetDuration(ctx context.Context, arg GetSetDurationParams) (sql.NullInt32, error) {
-	row := q.db.QueryRowContext(ctx, getSetDuration, arg.ID, arg.WorkoutExercisesID)
-	var duration_seconds sql.NullInt32
-	err := row.Scan(&duration_seconds)
-	return duration_seconds, err
+const getTotalSessionDistance = `-- name: GetTotalSessionDistance :one
+SELECT COALESCE(SUM(cardio_and_sets.distance), 0)::float8
+FROM cardio_and_sets
+JOIN workout_exercises
+ON cardio_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1
+`
+
+func (q *Queries) GetTotalSessionDistance(ctx context.Context, workoutSessionID uuid.UUID) (float64, error) {
+	row := q.db.QueryRowContext(ctx, getTotalSessionDistance, workoutSessionID)
+	var column_1 float64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
-const updateCardioAndSets = `-- name: UpdateCardioAndSets :one
+const updateCardioSet = `-- name: UpdateCardioSet :one
 UPDATE cardio_and_sets
 SET
     set_number = $1,
@@ -207,7 +280,7 @@ WHERE id = $5 AND workout_exercises_id = $6
 RETURNING id, workout_exercises_id, set_number, distance, is_kilometers, duration_seconds, created_at, updated_at
 `
 
-type UpdateCardioAndSetsParams struct {
+type UpdateCardioSetParams struct {
 	SetNumber          int32
 	Distance           sql.NullFloat64
 	IsKilometers       bool
@@ -216,8 +289,8 @@ type UpdateCardioAndSetsParams struct {
 	WorkoutExercisesID uuid.UUID
 }
 
-func (q *Queries) UpdateCardioAndSets(ctx context.Context, arg UpdateCardioAndSetsParams) (CardioAndSet, error) {
-	row := q.db.QueryRowContext(ctx, updateCardioAndSets,
+func (q *Queries) UpdateCardioSet(ctx context.Context, arg UpdateCardioSetParams) (CardioAndSet, error) {
+	row := q.db.QueryRowContext(ctx, updateCardioSet,
 		arg.SetNumber,
 		arg.Distance,
 		arg.IsKilometers,

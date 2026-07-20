@@ -295,7 +295,7 @@ func createTestExercise(t *testing.T, cfg *apiConfig, userID uuid.UUID) database
 
 func createTestWeightSet(t *testing.T, cfg *apiConfig, exercise database.WorkoutExercise) database.WeightsAndSet {
 	t.Helper()
-	weightSet, err := cfg.db.CreateWeightsAndSets(context.Background(), database.CreateWeightsAndSetsParams{
+	weightSet, err := cfg.db.CreateWeightAndSet(context.Background(), database.CreateWeightAndSetParams{
 		ID:                 uuid.New(),
 		WorkoutExercisesID: exercise.ID,
 		Weight:             25,
@@ -318,7 +318,7 @@ func createTestWeightSet(t *testing.T, cfg *apiConfig, exercise database.Workout
 		t.Fatalf("failed to create test weight set: %v", err)
 	}
 	t.Cleanup(func() {
-		err := cfg.db.DeleteWeightAndSets(context.Background(), database.DeleteWeightAndSetsParams{
+		err := cfg.db.DeleteWeightAndSet(context.Background(), database.DeleteWeightAndSetParams{
 			ID:                 weightSet.ID,
 			WorkoutExercisesID: weightSet.WorkoutExercisesID,
 		})
@@ -332,7 +332,7 @@ func createTestWeightSet(t *testing.T, cfg *apiConfig, exercise database.Workout
 
 func createTestCardioSet(t *testing.T, cfg *apiConfig, exercise database.WorkoutExercise) database.CardioAndSet {
 	t.Helper()
-	cardioSet, err := cfg.db.CreateCardioAndSets(context.Background(), database.CreateCardioAndSetsParams{
+	cardioSet, err := cfg.db.CreateCardioSet(context.Background(), database.CreateCardioSetParams{
 		ID:                 uuid.New(),
 		WorkoutExercisesID: exercise.ID,
 		SetNumber:          5,
@@ -352,7 +352,7 @@ func createTestCardioSet(t *testing.T, cfg *apiConfig, exercise database.Workout
 		t.Fatalf("failed to create test cardio set: %v", err)
 	}
 	t.Cleanup(func() {
-		err := cfg.db.DeleteCardioAndSets(context.Background(), database.DeleteCardioAndSetsParams{
+		err := cfg.db.DeleteCardioSet(context.Background(), database.DeleteCardioSetParams{
 			ID:                 cardioSet.ID,
 			WorkoutExercisesID: cardioSet.WorkoutExercisesID,
 		})

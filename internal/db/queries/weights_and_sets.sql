@@ -1,4 +1,4 @@
--- name: CreateWeightsAndSets :one
+-- name: CreateWeightAndSet :one
 INSERT INTO weights_and_sets(id, workout_exercises_id, weight, is_kilograms, set_number, reps_target, reps_actual, duration_seconds, rest_time_seconds, created_at, updated_at)
 VALUES(
     $1,
@@ -19,15 +19,16 @@ RETURNING *;
 SELECT * FROM weights_and_sets
 WHERE id = $1;
 
--- name: GetAllSetsFromSession :many
+-- name: GetAllSetsFromExercise :many
 SELECT * FROM weights_and_sets
 WHERE workout_exercises_id = $1;
 
 -- name: GetSetVolume :one
-SELECT (reps_actual * weight)::float8 FROM weights_and_sets
+SELECT COALESCE(reps_actual * weight, 0)::float8
+FROM weights_and_sets
 WHERE id = $1 AND workout_exercises_id = $2;
 
--- name: GetTotalVolumeFromAllSets :one
+-- name: GetTotalVolumeFromExerciseSets :one
 SELECT COALESCE(SUM(reps_actual * weight), 0)::float8 FROM weights_and_sets
 WHERE workout_exercises_id = $1;
 
@@ -35,15 +36,15 @@ WHERE workout_exercises_id = $1;
 SELECT COALESCE(duration_seconds, 0) + COALESCE(rest_time_seconds, 0) FROM weights_and_sets
 WHERE id = $1 AND workout_exercises_id = $2;
 
--- name: GetTotalDurationForAllSets :one
+-- name: GetTotalDurationForExercise :one
 SELECT COALESCE(SUM(COALESCE(duration_seconds, 0) + COALESCE(rest_time_seconds, 0)), 0)::int4 FROM weights_and_sets
 WHERE workout_exercises_id = $1;
 
--- name: DeleteWeightAndSets :exec
+-- name: DeleteWeightAndSet :exec
 DELETE FROM weights_and_sets
 WHERE id = $1 AND workout_exercises_id = $2;
 
--- name: UpdateWeightsAndSets :one
+-- name: UpdateWeightAndSet :one
 UPDATE weights_and_sets
 SET
     weight = $1,
@@ -56,3 +57,25 @@ SET
     updated_at = NOW()
 WHERE id = $8 AND workout_exercises_id = $9
 RETURNING *;
+
+-- name: GetAllWeightSetsFromSession :many
+SELECT weights_and_sets.*
+FROM weights_and_sets
+JOIN workout_exercises
+ON weights_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1
+ORDER BY workout_exercises.order_index, weights_and_sets.set_number;
+
+-- name: GetTotalSessionVolume :one
+SELECT COALESCE(SUM(weights_and_sets.weight * weights_and_sets.reps_actual), 0)::float8
+FROM weights_and_sets
+JOIN workout_exercises
+ON weights_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1;
+
+-- name: GetTotalSessionDuration :one
+SELECT COALESCE(SUM(COALESCE(duration_seconds,0) + COALESCE(rest_time_seconds,0)), 0)::int4
+FROM weights_and_sets
+JOIN workout_exercises
+ON weights_and_sets.workout_exercises_id = workout_exercises.id
+WHERE workout_exercises.workout_session_id = $1;

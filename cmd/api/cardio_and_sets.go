@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
 	"github.com/google/uuid"
@@ -13,11 +14,12 @@ import (
 type distanceResponse struct {
 	Distance float64 `json:"distance"`
 }
-type durationint64Response struct {
+
+type cardioDurationResponse struct {
 	TotalSeconds int64 `json:"total_seconds"`
 }
 
-func (cfg *apiConfig) handlerCreateCardioAndSets(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerCreateCardioSet(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
@@ -46,7 +48,8 @@ func (cfg *apiConfig) handlerCreateCardioAndSets(w http.ResponseWriter, r *http.
 		respondWithError(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	cardioSet, err := cfg.db.CreateCardioAndSets(r.Context(), database.CreateCardioAndSetsParams{
+	cardioSet, err := cfg.db.CreateCardioSet(r.Context(), database.CreateCardioSetParams{
+		ID:                 uuid.New(),
 		WorkoutExercisesID: params.WorkoutExercisesID,
 		SetNumber:          params.SetNumber,
 		Distance: sql.NullFloat64{
@@ -58,6 +61,8 @@ func (cfg *apiConfig) handlerCreateCardioAndSets(w http.ResponseWriter, r *http.
 			Int32: params.DurationSeconds,
 			Valid: params.DurationSeconds != 0,
 		},
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 	})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error writing to database", err)
@@ -66,7 +71,7 @@ func (cfg *apiConfig) handlerCreateCardioAndSets(w http.ResponseWriter, r *http.
 	respondWithJSON(w, http.StatusCreated, cardioSetResponse(cardioSet))
 }
 
-func (cfg *apiConfig) handlerGetAllCardioFromSession(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerGetAllCardioFromExercise(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
@@ -81,7 +86,7 @@ func (cfg *apiConfig) handlerGetAllCardioFromSession(w http.ResponseWriter, r *h
 		respondWithAuthError(w, err)
 		return
 	}
-	setsInSession, err := cfg.db.GetAllCardioFromSession(r.Context(), workoutExerciseID)
+	setsInSession, err := cfg.db.GetAllCardioFromExercise(r.Context(), workoutExerciseID)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve workout session", err)
 		return
@@ -92,7 +97,7 @@ func (cfg *apiConfig) handlerGetAllCardioFromSession(w http.ResponseWriter, r *h
 	}
 	respondWithJSON(w, http.StatusOK, response)
 }
-func (cfg *apiConfig) handlerDeleteCardioAndSets(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerDeleteCardioSet(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
@@ -107,7 +112,7 @@ func (cfg *apiConfig) handlerDeleteCardioAndSets(w http.ResponseWriter, r *http.
 		respondWithAuthError(w, err)
 		return
 	}
-	err = cfg.db.DeleteCardioAndSets(r.Context(), database.DeleteCardioAndSetsParams{
+	err = cfg.db.DeleteCardioSet(r.Context(), database.DeleteCardioSetParams{
 		ID:                 cardioSet.ID,
 		WorkoutExercisesID: cardioSet.WorkoutExercisesID,
 	})
@@ -118,7 +123,7 @@ func (cfg *apiConfig) handlerDeleteCardioAndSets(w http.ResponseWriter, r *http.
 	respondWithJSON(w, http.StatusOK, msgResponse{"Deletion successful"})
 }
 
-func (cfg *apiConfig) handlerUpdateCardioAndSets(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerUpdateCardioSet(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
@@ -151,7 +156,7 @@ func (cfg *apiConfig) handlerUpdateCardioAndSets(w http.ResponseWriter, r *http.
 		respondWithError(w, http.StatusBadRequest, err.Error(), nil)
 		return
 	}
-	updatedSet, err := cfg.db.UpdateCardioAndSets(r.Context(), database.UpdateCardioAndSetsParams{
+	updatedSet, err := cfg.db.UpdateCardioSet(r.Context(), database.UpdateCardioSetParams{
 		SetNumber: params.SetNumber,
 		Distance: sql.NullFloat64{
 			Float64: params.Distance,
@@ -198,76 +203,188 @@ func (cfg *apiConfig) handlerGetSetDistance(w http.ResponseWriter, r *http.Reque
 	respondWithJSON(w, http.StatusOK, distanceResponse{Distance: setDistance.Float64})
 
 }
-func (cfg *apiConfig) handlerGetAllSetsDistance(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerGetExerciseDistance(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
 	}
-	cardioSetID, err := uuid.Parse(r.PathValue("id"))
+
+	exerciseID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
 		return
 	}
-	cardioSet, err := cfg.authorizeCardioSet(r.Context(), cardioSetID, userID)
+
+	_, err = cfg.authorizeWorkoutExercise(r.Context(), exerciseID, userID)
 	if err != nil {
 		respondWithAuthError(w, err)
 		return
 	}
-	setDistance, err := cfg.db.GetAllSetsDistance(r.Context(), cardioSet.WorkoutExercisesID)
+
+	distance, err := cfg.db.GetAllSetsDistance(r.Context(), exerciseID)
+
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to get distance", err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, distanceResponse{Distance: float64(setDistance)})
 
+	respondWithJSON(w, http.StatusOK, distanceResponse{
+		Distance: float64(distance),
+	})
 }
-func (cfg *apiConfig) handlerGetSetDuration(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerGetCardioExerciseDuration(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
 	}
+
+	exerciseID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
+		return
+	}
+
+	_, err = cfg.authorizeWorkoutExercise(r.Context(), exerciseID, userID)
+	if err != nil {
+		respondWithAuthError(w, err)
+		return
+	}
+
+	duration, err := cfg.db.GetAllCardioSetsDuration(r.Context(), exerciseID)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get duration", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, cardioDurationResponse{
+		TotalSeconds: duration,
+	})
+}
+
+func (cfg *apiConfig) handlerGetAllCardioSessionSets(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+
+	sessionID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		return
+	}
+
+	_, err = cfg.authorizeWorkoutSession(r.Context(), sessionID, userID)
+	if err != nil {
+		respondWithAuthError(w, err)
+		return
+	}
+
+	sets, err := cfg.db.GetAllCardioSetsFromSession(r.Context(), sessionID)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to retrieve sets", err)
+		return
+	}
+
+	response := make([]cardioAndSets, 0, len(sets))
+
+	for _, s := range sets {
+		response = append(response, cardioSetResponse(s))
+	}
+
+	respondWithJSON(w, http.StatusOK, response)
+}
+
+func (cfg *apiConfig) handlerGetAllCardioSessionDuration(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+
+	sessionID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		return
+	}
+
+	_, err = cfg.authorizeWorkoutSession(r.Context(), sessionID, userID)
+
+	if err != nil {
+		respondWithAuthError(w, err)
+		return
+	}
+
+	duration, err := cfg.db.GetTotalSessionCardioDuration(r.Context(), sessionID)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get duration", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, cardioDurationResponse{
+		TotalSeconds: duration,
+	})
+}
+func (cfg *apiConfig) handlerGetAllSessionDistance(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+
+	sessionID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid session ID", err)
+		return
+	}
+
+	_, err = cfg.authorizeWorkoutSession(r.Context(), sessionID, userID)
+	if err != nil {
+		respondWithAuthError(w, err)
+		return
+	}
+
+	distance, err := cfg.db.GetTotalSessionDistance(r.Context(), sessionID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to get distance", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, distanceResponse{
+		Distance: distance,
+	})
+}
+func (cfg *apiConfig) handlerGetCardioSetDuration(w http.ResponseWriter, r *http.Request) {
+	userID, err := cfg.getUserIDFromToken(w, r)
+	if err != nil {
+		return
+	}
+
 	cardioSetID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
 		return
 	}
+
 	cardioSet, err := cfg.authorizeCardioSet(r.Context(), cardioSetID, userID)
 	if err != nil {
 		respondWithAuthError(w, err)
 		return
 	}
-	duration, err := cfg.db.GetSetDuration(r.Context(), database.GetSetDurationParams{
+
+	duration, err := cfg.db.GetCardioSetDuration(r.Context(), database.GetCardioSetDurationParams{
 		ID:                 cardioSet.ID,
 		WorkoutExercisesID: cardioSet.WorkoutExercisesID,
-	})
+	},
+	)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Failed to get duration", err)
 		return
 	}
-	respondWithJSON(w, http.StatusOK, durationint64Response{TotalSeconds: int64(duration.Int32)})
-}
 
-func (cfg *apiConfig) handlerGetAllSetsDuration(w http.ResponseWriter, r *http.Request) {
-	userID, err := cfg.getUserIDFromToken(w, r)
-	if err != nil {
-		return
-	}
-	cardioSetID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid set ID", err)
-		return
-	}
-	cardioSet, err := cfg.authorizeCardioSet(r.Context(), cardioSetID, userID)
-	if err != nil {
-		respondWithAuthError(w, err)
-		return
-	}
-	totalDuration, err := cfg.db.GetAllSetsDuration(r.Context(), cardioSet.WorkoutExercisesID)
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to get duration", err)
-		return
-	}
-	respondWithJSON(w, http.StatusOK, durationint64Response{TotalSeconds: totalDuration})
+	respondWithJSON(w, http.StatusOK, cardioDurationResponse{
+		TotalSeconds: int64(duration.Int32),
+	})
 }
 
 /*
