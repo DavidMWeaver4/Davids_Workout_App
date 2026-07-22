@@ -7,13 +7,11 @@ import (
 	"testing"
 
 	"github.com/DavidMWeaver4/Davids_Workout_App/internal/database"
+	"github.com/google/uuid"
 )
 
 func TestHandlerCreateExercise_Success(t *testing.T) {
-	cfg := newTestAPIConfig(t)
-	user := createTestUser(t, cfg)
-	token := testingCreateJWT(t, cfg, user.ID)
-
+	x := testingExerciseHandlerSetup(t)
 	type requestBody struct {
 		ExerciseName    string   `json:"exercise_name"`
 		TargetMuscles   []string `json:"target_muscles"`
@@ -30,10 +28,10 @@ func TestHandlerCreateExercise_Success(t *testing.T) {
 		Description:     "compound movement",
 	}
 
-	jsonBody := testingMarshalJSON(t, body)
+	JSONBody := testingMarshalJSON(t, body)
 
-	req := testingCreateAuthenticatedJSONRequest(http.MethodPost, "/api/v1/exercises", jsonBody, token)
-	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerCreateExercises), req)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPost, "/api/v1/exercises", JSONBody, x.token)
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerCreateExercises), req)
 
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusCreated, rr.Code, rr.Body.String())
@@ -49,17 +47,20 @@ func TestHandlerCreateExercise_Success(t *testing.T) {
 		t.Fatal("expected 1 target muscle")
 	}
 
-	dbExercise, err := cfg.db.GetExerciseFromID(context.Background(), response.ID)
-	t.Cleanup(func() {
-		cfg.db.DeleteExerciseByID(context.Background(), database.DeleteExerciseByIDParams{
-			ID:     response.ID,
-			UserID: dbExercise.UserID,
-		})
-	})
-
+	dbExercise, err := x.cfg.db.GetExerciseFromID(context.Background(), response.ID)
 	if err != nil {
-		t.Fatal("exercise was not inserted into database")
+		t.Fatalf("GetExerciseFromID failed: %v", err)
 	}
+	t.Cleanup(func() {
+		x.cfg.db.DeleteExerciseByID(context.Background(), database.DeleteExerciseByIDParams{
+			ID: response.ID,
+			UserID: uuid.NullUUID{
+				UUID:  x.user.ID,
+				Valid: true,
+			},
+		},
+		)
+	})
 
 	if dbExercise.ExerciseName != body.ExerciseName {
 		t.Fatal("database value does not match entry data")
@@ -67,37 +68,32 @@ func TestHandlerCreateExercise_Success(t *testing.T) {
 }
 
 func TestHandlerDeleteExercise_Success(t *testing.T) {
+	x := testingExerciseHandlerSetup(t)
 
-	cfg := newTestAPIConfig(t)
-	user := createTestUser(t, cfg)
-	token := testingCreateJWT(t, cfg, user.ID)
+	exerciseToDelete := createTestExercise(t, x.cfg, x.user.ID)
 
-	exerciseToDelete := createTestExercise(t, cfg, user.ID)
-
-	req := testingCreateAuthenticatedJSONRequest(http.MethodDelete, "/api/v1/exercises/"+exerciseToDelete.ID.String(), nil, token)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodDelete, "/api/v1/exercises/"+exerciseToDelete.ID.String(), nil, x.token)
 	req.SetPathValue("id", exerciseToDelete.ID.String())
-	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerDeleteExercisesByID), req)
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerDeleteExercisesByID), req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
 	}
 
-	_, err := cfg.db.GetExerciseFromID(context.Background(), exerciseToDelete.ID)
+	_, err := x.cfg.db.GetExerciseFromID(context.Background(), exerciseToDelete.ID)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
 func TestHandlerGetExerciseFromID_Success(t *testing.T) {
-	cfg := newTestAPIConfig(t)
-	user := createTestUser(t, cfg)
-	token := testingCreateJWT(t, cfg, user.ID)
+	x := testingExerciseHandlerSetup(t)
 
-	exerciseToFind := createTestExercise(t, cfg, user.ID)
+	exerciseToFind := createTestExercise(t, x.cfg, x.user.ID)
 	exerciseID := exerciseToFind.ID
 
-	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/exercises/"+exerciseID.String(), nil, token)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/exercises/"+exerciseID.String(), nil, x.token)
 	req.SetPathValue("id", exerciseID.String())
-	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerGetExerciseFromID), req)
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerGetExerciseFromID), req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
@@ -109,15 +105,13 @@ func TestHandlerGetExerciseFromID_Success(t *testing.T) {
 }
 
 func TestHandlerSearchExercises_Success(t *testing.T) {
-	cfg := newTestAPIConfig(t)
-	user := createTestUser(t, cfg)
-	token := testingCreateJWT(t, cfg, user.ID)
+	x := testingExerciseHandlerSetup(t)
 
-	testExercise := createTestExercise(t, cfg, user.ID)
+	testExercise := createTestExercise(t, x.cfg, x.user.ID)
 
-	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/exercises/search?muscle=chest&equipment=barbell&difficulty=beginner", nil, token)
-	req.Header.Set("Authorization", "Bearer "+token)
-	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerSearchExercises), req)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/exercises/search?muscle=chest&equipment=barbell&difficulty=beginner", nil, x.token)
+	req.Header.Set("Authorization", "Bearer "+x.token)
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerSearchExercises), req)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
@@ -142,11 +136,9 @@ func TestHandlerSearchExercises_Success(t *testing.T) {
 	}
 }
 func TestHandlerUpdateExercise_Success(t *testing.T) {
-	cfg := newTestAPIConfig(t)
-	user := createTestUser(t, cfg)
-	token := testingCreateJWT(t, cfg, user.ID)
+	x := testingExerciseHandlerSetup(t)
 
-	testExercise := createTestExercise(t, cfg, user.ID)
+	testExercise := createTestExercise(t, x.cfg, x.user.ID)
 	type requestBody struct {
 		ExerciseName    string   `json:"exercise_name"`
 		TargetMuscles   []string `json:"target_muscles"`
@@ -165,15 +157,15 @@ func TestHandlerUpdateExercise_Success(t *testing.T) {
 
 	jsonBody := testingMarshalJSON(t, body)
 
-	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/exercises/"+testExercise.ID.String(), jsonBody, token)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/exercises/"+testExercise.ID.String(), jsonBody, x.token)
 	req.SetPathValue("id", testExercise.ID.String())
-	rr := testingExecuteRequest(http.HandlerFunc(cfg.handlerUpdateExercise), req)
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateExercise), req)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
 	}
 	response := testingDecodeJSONResponse[exercise](t, rr)
 
-	dbExercise, err := cfg.db.GetExerciseFromID(context.Background(), response.ID)
+	dbExercise, err := x.cfg.db.GetExerciseFromID(context.Background(), response.ID)
 
 	if err != nil {
 		t.Fatal("exercise was not updated in database")
@@ -184,5 +176,27 @@ func TestHandlerUpdateExercise_Success(t *testing.T) {
 		dbExercise.Description.String != body.Description ||
 		dbExercise.DifficultyLevel.String != body.DifficultyLevel {
 		t.Fatal("database value does not match entry data")
+	}
+}
+
+type ExerciseHandlerFixture struct {
+	ctx   context.Context
+	cfg   *apiConfig
+	user  database.User
+	token string
+}
+
+func testingExerciseHandlerSetup(t *testing.T) ExerciseHandlerFixture {
+	t.Helper()
+	cfg := newTestAPIConfig(t)
+	user := createTestUser(t, cfg)
+	token := testingCreateJWT(t, cfg, user.ID)
+	t.Logf("user id: %v", user.ID)
+	t.Logf("cfg nil: %v", cfg == nil)
+	return ExerciseHandlerFixture{
+		ctx:   context.Background(),
+		cfg:   cfg,
+		user:  user,
+		token: token,
 	}
 }

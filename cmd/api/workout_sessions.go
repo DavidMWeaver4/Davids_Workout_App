@@ -73,7 +73,7 @@ func (cfg *apiConfig) handlerGetAllMyWorkoutSessions(w http.ResponseWriter, r *h
 	respondWithJSON(w, http.StatusOK, response)
 
 }
-func (cfg *apiConfig) handlerGetWorkoutSessionById(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerGetWorkoutSessionByID(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
