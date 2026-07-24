@@ -1,17 +1,17 @@
 ## David's Workout App
 ![Status](https://github.com/DavidMWeaver4/Davids_Workout_App/actions/workflows/ci.yml/badge.svg)
 
-Backend REST API consisting of 49 endpoints, PostgreSQL persistence, JWT authentication, Dockerized development, and an expanding suite of unit tests.
+Backend REST API containing 49 endpoints, PostgreSQL persistence, JWT authentication, Dockerized development, and a growing suite of unit tests.
 
 ## Features
 - 49 REST API endpoints
 - JWT-based authentication
 - Authorization middleware
 - Unit tested handlers and authentication logic
-- SQLC-generated type-safe database access
+- SQLC generated type-safe database access
 - PostgreSQL database
 - GitHub Actions CI pipeline
-- Docker-based local development
+- Docker based local development
 - Goose migrations
 - Workout session management
 - Exercise tracking
@@ -21,13 +21,13 @@ Backend REST API consisting of 49 endpoints, PostgreSQL persistence, JWT authent
 
 
 This application allows users to:
-- Create accounts securely using JWT authentication
+- Create secure accounts using JWT authentication
 - Create and manage workout sessions
-- Track exercises, sets, reps, and weight
-- Create custom exercises
-- Keep personal workout data private between users
+- Track exercises, sets, and reps for both cardio and weight exercises
+- Create custom exercises and use a common pool of exercises
+- Keep their personal workout data private from other users
 
-The backend is built with Go and PostgreSQL. SQLC is used to generate type-safe database queries while Goose manages database migrations, and Docker provides a reproducible local development enviroment.
+The backend is built with Go and PostgreSQL. SQLC is used to generate type-safe database queries. Goose manages database migrations. Docker provides a reproducible local development environment.
 
 Technologies:
 - Go
@@ -38,14 +38,13 @@ Technologies:
 - Docker
 
 > This project is not finished and is in active development
-## Motivations
-Recently, I started focusing more on fitness and wanted a simple way to plan and track workouts. Most workout apps I tried required expensive monthly subscriptions to create your own workouts and were heavily focused on AI features that felt unnecessary for basic workout tracking.
 
-I decided to build my own workout app both as a personal tool and as a way to improve my software engineering skills.
+## Motivations
+Recently, I started focusing more on my personal fitness and wanted a simple way to plan and track my workouts. Most workout apps I tried required expensive monthly subscriptions to create your own workout sessions. I personally do not like doing deadlifts and squats, but every premade session seemed to have these and I couldn't replace them with different exercises. Almost every app on the market currently is heavily focused on AI features like AI calorie detectors and AI generated workout plans. This increased subscription costs while not adding value for the type of workout app I was looking for. So I made my own. 
 
 
 ## Getting Started
-In order to run this application you need:
+To run this application you need:
 - Docker (developed and tested with version 4.71.0)
 
 ## Quick Start
@@ -80,7 +79,7 @@ In order to run this application you need:
   ```
 
 ## Deployment Notes
-For ease of testing, this project includes default local database credentials and a fallback JWT secret so the application can be run immediately after cloning.
+To ease testing, this project includes default local database credentials and a fallback JWT secret so the application can be run immediately after cloning.
 
 These defaults exist only for local development and portfolio demonstration purposes.
 In a real deployment environment, all configuration values should be supplied through environment variables.
@@ -220,4 +219,4 @@ make test
 
 ### Submit a pull request
 
-If you'd like to contribute, please fork the repository and open a pull request to the `main` branch.
+If you'd like to contribute, please fork the repository and open a pull request.
