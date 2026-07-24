@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -170,44 +171,139 @@ func (cfg *apiConfig) handlerGetNumOfWorkoutsInSession(w http.ResponseWriter, r 
 	}
 	respondWithJSON(w, http.StatusOK, countResponse{Count: count})
 }
-func (cfg *apiConfig) handlerUpdateWorkoutExerciseOrder(w http.ResponseWriter, r *http.Request) {
+
+/*
+//This func has been depreciated due to its function replaced by the more roboust handlerUpdateWorkoutExercise
+
+	func (cfg *apiConfig) handlerUpdateWorkoutExerciseOrder(w http.ResponseWriter, r *http.Request) {
+		userID, err := cfg.getUserIDFromToken(w, r)
+		if err != nil {
+			return
+		}
+
+		exerciseID, err := uuid.Parse(r.PathValue("id"))
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
+			return
+		}
+		workExercise, err := cfg.authorizeWorkoutExercise(r.Context(), exerciseID, userID)
+		if err != nil {
+			respondWithAuthError(w, err)
+			return
+		}
+		type parameters struct {
+			OrderIndex int32 `json:"order_index"`
+		}
+
+		var params parameters
+
+		err = json.NewDecoder(r.Body).Decode(&params)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid request body", err)
+			return
+		}
+		if params.OrderIndex < 0 {
+			respondWithError(w, http.StatusBadRequest, "order_index must be non-negative", nil)
+			return
+		}
+		updatedExercise, err := cfg.db.UpdateWorkoutExerciseOrder(r.Context(), database.UpdateWorkoutExerciseOrderParams{
+			OrderIndex:       params.OrderIndex,
+			ID:               workExercise.ID,
+			WorkoutSessionID: workExercise.WorkoutSessionID,
+		})
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to update exercise", err)
+			return
+		}
+
+		respondWithJSON(w, http.StatusOK, dbExerciseToResponse(updatedExercise))
+	}
+*/
+func (cfg *apiConfig) handlerUpdateWorkoutExercise(w http.ResponseWriter, r *http.Request) {
 	userID, err := cfg.getUserIDFromToken(w, r)
 	if err != nil {
 		return
 	}
 
-	exerciseID, err := uuid.Parse(r.PathValue("id"))
+	workoutExerciseID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid exercise ID", err)
+		respondWithError(w, http.StatusBadRequest, "Invalid workout exercise ID", err)
 		return
 	}
-	workExercise, err := cfg.authorizeWorkoutExercise(r.Context(), exerciseID, userID)
+
+	workoutExercise, err := cfg.authorizeWorkoutExercise(r.Context(), workoutExerciseID, userID)
 	if err != nil {
 		respondWithAuthError(w, err)
 		return
 	}
+
 	type parameters struct {
-		OrderIndex int32 `json:"order_index"`
+		ExerciseName *string `json:"exercise_name,omitempty"`
+		OrderIndex   *int32  `json:"order_index,omitempty"`
+		Notes        *string `json:"notes,omitempty"`
 	}
 
 	var params parameters
-
-	err = json.NewDecoder(r.Body).Decode(&params)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request body", err)
 		return
 	}
-	if params.OrderIndex < 0 {
-		respondWithError(w, http.StatusBadRequest, "order_index must be non-negative", nil)
+
+	exerciseID := workoutExercise.ExerciseID
+	orderIndex := workoutExercise.OrderIndex
+	notes := workoutExercise.Notes
+	changed := false
+
+	if params.ExerciseName != nil {
+		exerciseName := strings.TrimSpace(*params.ExerciseName)
+		changed = true
+		if exerciseName == "" {
+			respondWithError(w, http.StatusBadRequest, "Please enter an exercise name", nil)
+			return
+		}
+
+		exercise, err := cfg.db.GetExerciseFromName(r.Context(), exerciseName)
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusNotFound, "Exercise not found", nil)
+			return
+		}
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Failed to retrieve exercise", err)
+			return
+		}
+
+		exerciseID = exercise.ID
+	}
+
+	if params.OrderIndex != nil {
+		changed = true
+		if *params.OrderIndex < 0 {
+			respondWithError(w, http.StatusBadRequest, "order_index must be non-negative", nil)
+			return
+		}
+		orderIndex = *params.OrderIndex
+	}
+
+	if params.Notes != nil {
+		changed = true
+		notes = sql.NullString{
+			String: *params.Notes,
+			Valid:  *params.Notes != "",
+		}
+	}
+	if !changed {
+		respondWithError(w, http.StatusBadRequest, "No fields provided to update", nil)
 		return
 	}
-	updatedExercise, err := cfg.db.UpdateWorkoutExerciseOrder(r.Context(), database.UpdateWorkoutExerciseOrderParams{
-		OrderIndex:       params.OrderIndex,
-		ID:               workExercise.ID,
-		WorkoutSessionID: workExercise.WorkoutSessionID,
+	updatedExercise, err := cfg.db.UpdateWorkoutExercise(r.Context(), database.UpdateWorkoutExerciseParams{
+		ExerciseID:       exerciseID,
+		OrderIndex:       orderIndex,
+		Notes:            notes,
+		ID:               workoutExercise.ID,
+		WorkoutSessionID: workoutExercise.WorkoutSessionID,
 	})
 	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Failed to update exercise", err)
+		respondWithError(w, http.StatusInternalServerError, "Failed to update workout exercise", err)
 		return
 	}
 

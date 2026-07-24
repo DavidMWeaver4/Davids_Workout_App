@@ -33,3 +33,9 @@ RETURNING *;
 -- name: DeleteWorkoutExercises :exec
 DELETE FROM workout_exercises
 WHERE id = $1 AND workout_session_id = $2;
+
+-- name: UpdateWorkoutExercise :one
+UPDATE workout_exercises
+SET exercise_id = $1, order_index = $2, notes = $3, updated_at = NOW()
+WHERE id = $4 AND workout_session_id = $5
+RETURNING *;

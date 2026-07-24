@@ -144,6 +144,42 @@ func (q *Queries) GetWorkoutsInSession(ctx context.Context, workoutSessionID uui
 	return items, nil
 }
 
+const updateWorkoutExercise = `-- name: UpdateWorkoutExercise :one
+UPDATE workout_exercises
+SET exercise_id = $1, order_index = $2, notes = $3, updated_at = NOW()
+WHERE id = $4 AND workout_session_id = $5
+RETURNING id, workout_session_id, exercise_id, order_index, notes, created_at, updated_at
+`
+
+type UpdateWorkoutExerciseParams struct {
+	ExerciseID       uuid.UUID
+	OrderIndex       int32
+	Notes            sql.NullString
+	ID               uuid.UUID
+	WorkoutSessionID uuid.UUID
+}
+
+func (q *Queries) UpdateWorkoutExercise(ctx context.Context, arg UpdateWorkoutExerciseParams) (WorkoutExercise, error) {
+	row := q.db.QueryRowContext(ctx, updateWorkoutExercise,
+		arg.ExerciseID,
+		arg.OrderIndex,
+		arg.Notes,
+		arg.ID,
+		arg.WorkoutSessionID,
+	)
+	var i WorkoutExercise
+	err := row.Scan(
+		&i.ID,
+		&i.WorkoutSessionID,
+		&i.ExerciseID,
+		&i.OrderIndex,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateWorkoutExerciseOrder = `-- name: UpdateWorkoutExerciseOrder :one
 UPDATE workout_exercises
 SET order_index = $1, updated_at = NOW()

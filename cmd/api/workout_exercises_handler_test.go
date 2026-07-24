@@ -10,7 +10,6 @@ import (
 )
 
 func TestHandlerCreateWorkoutExercise_Success(t *testing.T) {
-	//POST /api/v1/workout_exercises", apiCfg.handlerCreateWorkoutExercise
 	x := testingWorkoutExerciseHandlerSetup(t)
 	type requestBody struct {
 		ExerciseName     string    `json:"exercise_name"`
@@ -18,10 +17,9 @@ func TestHandlerCreateWorkoutExercise_Success(t *testing.T) {
 		OrderIndex       int32     `json:"order_index"`
 		Notes            string    `json:"notes"`
 	}
-	exercise := createTestExercise(t, x.cfg, x.user.ID)
 
 	body := requestBody{
-		ExerciseName:     exercise.ExerciseName,
+		ExerciseName:     x.exercise.ExerciseName,
 		WorkoutSessionID: x.workoutSession.ID,
 		OrderIndex:       0,
 		Notes:            "testing note",
@@ -58,12 +56,8 @@ func TestHandlerCreateWorkoutExercise_Success(t *testing.T) {
 	}
 }
 func TestHandlerGetWorkoutExercise_Success(t *testing.T) {
-
-	//GET /api/v1/workout_exercises/{id}", apiCfg.handlerGetWorkoutExercises)
 	x := testingWorkoutExerciseHandlerSetup(t)
-	exercise := createTestExercise(t, x.cfg, x.user.ID)
-
-	exerciseToFind := createTestWorkoutExercise(t, x.cfg, x.workoutSession, exercise.ID)
+	exerciseToFind := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
 
 	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/workout_exercises/"+exerciseToFind.ID.String(), nil, x.token)
 	req.SetPathValue("id", exerciseToFind.ID.String())
@@ -77,35 +71,120 @@ func TestHandlerGetWorkoutExercise_Success(t *testing.T) {
 		t.Fatalf("expected session ID %v, to match %v", response.ID, exerciseToFind.ID)
 	}
 }
+
 func TestHandlerGetWorkoutExercisesInSession(t *testing.T) {
-	t.Skip()
-	//mux.HandleFunc("GET /api/v1/workout_sessions/{session_id}/exercises", apiCfg.handlerGetWorkoutExercisesInSession)
+	x := testingWorkoutExerciseHandlerSetup(t)
+	exercise2 := createTestExercise(t, x.cfg, x.user.ID)
+	workoutExercise1 := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	workoutExercise2 := createTestWorkoutExercise(t, x.cfg, x.workoutSession, exercise2.ID)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/workout_sessions/"+x.workoutSession.ID.String()+"/exercises", nil, x.token)
+	req.SetPathValue("id", x.workoutSession.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerGetWorkoutExercisesInSession), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	response := testingDecodeJSONResponse[[]workoutExercise](t, rr)
+	if len(response) != 2 {
+		t.Fatalf("expected 2 workout exercises, got %d", len(response))
+	}
+	expectedIDs := map[uuid.UUID]bool{workoutExercise1.ID: false, workoutExercise2.ID: false}
+	for _, item := range response {
+		if _, ok := expectedIDs[item.ID]; ok {
+			expectedIDs[item.ID] = true
+		}
+	}
+	if expectedIDs[workoutExercise1.ID] != true || expectedIDs[workoutExercise2.ID] != true {
+		t.Fatal("did not find correct workout exercises")
+	}
 }
+
 func TestHandlerDeleteWorkoutExercises_Success(t *testing.T) {
-	t.Skip()
-	//mux.HandleFunc("DELETE /api/v1/workout_exercises/{id}", apiCfg.handlerDeleteWorkoutExercises)
-
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodDelete, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), nil, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerDeleteWorkoutExercises), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	_, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err == nil {
+		t.Fatal("expected workout exercise to be deleted")
+	}
 }
+
 func TestHandlerGetNumOfWorkoutsInSession_Success(t *testing.T) {
-	t.Skip()
-	//mux.HandleFunc("GET /api/v1/workout_sessions/{session_id}/exercises/count", apiCfg.handlerGetNumOfWorkoutsInSession)
-}
-func TestHandlerUpdateWorkoutExerciseOrder_Success(t *testing.T) {
-	t.Skip()
-	//mux.HandleFunc("PUT /api/v1/workout_exercises/{id}", apiCfg.handlerUpdateWorkoutExerciseOrder)
+	x := testingWorkoutExerciseHandlerSetup(t)
+	_ = createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	secondEx := createTestExercise(t, x.cfg, x.user.ID)
+	_ = createTestWorkoutExercise(t, x.cfg, x.workoutSession, secondEx.ID)
+
+	req := testingCreateAuthenticatedJSONRequest(http.MethodGet, "/api/v1/workout_sessions/"+x.workoutSession.ID.String()+"/exercises/count", nil, x.token)
+	req.SetPathValue("id", x.workoutSession.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerGetNumOfWorkoutsInSession), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	response := testingDecodeJSONResponse[countResponse](t, rr)
+	if response.Count != 2 {
+		t.Fatalf("got unexpected length: %d", response.Count)
+	}
 }
 
+func TestHandlerUpdateWorkoutExercise_Success(t *testing.T) {
+	x := testingWorkoutExerciseHandlerSetup(t)
+	newExercise := createTestExercise(t, x.cfg, x.user.ID)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		ExerciseName string  `json:"exercise_name"`
+		OrderIndex   int32   `json:"order_index"`
+		Notes        *string `json:"notes,omitempty"`
+	}
+	newString := "updated test note"
+	body := requestBody{
+		ExerciseName: newExercise.ExerciseName,
+		OrderIndex:   2,
+		Notes:        &newString,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("session was not in database")
+	}
+	if dbWOExercise.Notes.String != *body.Notes ||
+		dbWOExercise.OrderIndex != body.OrderIndex ||
+		dbWOExercise.ExerciseID != newExercise.ID {
+		t.Fatal("database value does not match entry data")
+	}
+}
+
+/*
+ *
+ *
+ * helpers
+ *
+ *
+ */
 func testingWorkoutExerciseHandlerSetup(t *testing.T) WorkoutExerciseHandlerFixture {
 	cfg := newTestAPIConfig(t)
 	user := createTestUser(t, cfg)
 	token := testingCreateJWT(t, cfg, user.ID)
 	workoutSession := createTestWorkoutSession(t, cfg, user.ID)
+	exercise := createTestExercise(t, cfg, user.ID)
 	return WorkoutExerciseHandlerFixture{
 		ctx:            context.Background(),
 		cfg:            cfg,
 		user:           user,
 		token:          token,
 		workoutSession: workoutSession,
+		exercise:       exercise,
 	}
 }
 
@@ -115,4 +194,5 @@ type WorkoutExerciseHandlerFixture struct {
 	user           database.User
 	token          string
 	workoutSession database.WorkoutSession
+	exercise       database.Exercise
 }

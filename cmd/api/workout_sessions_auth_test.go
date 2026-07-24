@@ -44,11 +44,10 @@ func TestAuthorizeWorkoutSession_Forbidden(t *testing.T) {
 
 func TestAuthorizeWorkoutSession_NotFound(t *testing.T) {
 	x := newWorkoutSessionFixture(t)
-	//want to make sure there is something inside the db even if its going to fail
 
 	_, err := x.cfg.authorizeWorkoutSession(x.ctx, uuid.New(), x.user.ID)
 	if err == nil {
-		t.Fatal("expected ErrForbidden, got nil")
+		t.Fatal("expected ErrNotFound, got nil")
 	}
 	if !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected ErrNotFound, got %v", err)
