@@ -72,7 +72,7 @@ func TestHandlerGetWorkoutExercise_Success(t *testing.T) {
 	}
 }
 
-func TestHandlerGetWorkoutExercisesInSession(t *testing.T) {
+func TestHandlerGetWorkoutExercisesInSession_Success(t *testing.T) {
 	x := testingWorkoutExerciseHandlerSetup(t)
 	exercise2 := createTestExercise(t, x.cfg, x.user.ID)
 	workoutExercise1 := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
@@ -158,13 +158,296 @@ func TestHandlerUpdateWorkoutExercise_Success(t *testing.T) {
 	if err != nil {
 		t.Fatal("session was not in database")
 	}
-	if dbWOExercise.Notes.String != *body.Notes ||
-		dbWOExercise.OrderIndex != body.OrderIndex ||
-		dbWOExercise.ExerciseID != newExercise.ID {
-		t.Fatal("database value does not match entry data")
+	if dbWOExercise.Notes.String != *body.Notes {
+		t.Errorf("expected notes %q, got %q", *body.Notes, dbWOExercise.Notes.String)
+	}
+	if dbWOExercise.OrderIndex != body.OrderIndex {
+		t.Errorf("expected order index %d, got %d", body.OrderIndex, dbWOExercise.OrderIndex)
+	}
+	if dbWOExercise.ExerciseID != newExercise.ID {
+		t.Errorf("expected exercise id %v, got %v", newExercise.ID, dbWOExercise.ExerciseID)
 	}
 }
+func TestHandlerUpdateWorkoutExercise_Unauthorized(t *testing.T) {
+	t.Skip()
+}
+func TestHandlerUpdateWorkoutExercise_Forbidden(t *testing.T) {
+	t.Skip()
+}
+func TestHandlerUpdateWorkoutExercise_NotFound(t *testing.T) {
+	t.Skip()
+}
+func TestHandlerUpdateWorkoutExercise_InvalidWorkoutExerciseID(t *testing.T) {
+	x := testingWorkoutExerciseHandlerSetup(t)
+	newExercise := createTestExercise(t, x.cfg, x.user.ID)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		ExerciseName string  `json:"exercise_name"`
+		OrderIndex   int32   `json:"order_index"`
+		Notes        *string `json:"notes,omitempty"`
+	}
+	newString := "updated test note"
+	body := requestBody{
+		ExerciseName: newExercise.ExerciseName,
+		OrderIndex:   2,
+		Notes:        &newString,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+"notarealuuid", JSONBody, x.token)
+	req.SetPathValue("id", "notarealuuid")
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d got %d: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise should still exist in database")
+	}
+	if dbWOExercise.ExerciseID != x.exercise.ID {
+		t.Fatal("exercise ID should not have changed")
+	}
+}
+func TestHandlerUpdateWorkoutExercise_InvalidJSON(t *testing.T) {
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	JSONBody := []byte(`{"exercise_name":`)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d got %d: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise should still exist")
+	}
 
+	if dbWOExercise.ExerciseID != workoutExercise.ExerciseID {
+		t.Fatal("exercise should not have been modified")
+	}
+
+	if dbWOExercise.OrderIndex != workoutExercise.OrderIndex {
+		t.Fatal("order index should not have been modified")
+	}
+
+	if dbWOExercise.Notes.String != workoutExercise.Notes.String {
+		t.Fatal("notes should not have been modified")
+	}
+}
+func TestHandlerUpdateWorkoutExercise_NoFieldsProvided(t *testing.T) {
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		ExerciseName *string `json:"exercise_name,omitempty"`
+		OrderIndex   *int32  `json:"order_index,omitempty"`
+		Notes        *string `json:"notes,omitempty"`
+	}
+	body := requestBody{}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d got %d: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise should still exist")
+	}
+
+	if dbWOExercise.ExerciseID != workoutExercise.ExerciseID {
+		t.Fatal("exercise should not have been modified")
+	}
+
+	if dbWOExercise.OrderIndex != workoutExercise.OrderIndex {
+		t.Fatal("order index should not have been modified")
+	}
+
+	if dbWOExercise.Notes.String != workoutExercise.Notes.String {
+		t.Fatal("notes should not have been modified")
+	}
+}
+func TestHandlerUpdateWorkoutExercise_ExerciseNameEmpty(t *testing.T) {
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		ExerciseName string  `json:"exercise_name"`
+		OrderIndex   int32   `json:"order_index"`
+		Notes        *string `json:"notes,omitempty"`
+	}
+	newString := "updated test note"
+	body := requestBody{
+		ExerciseName: "",
+		OrderIndex:   2,
+		Notes:        &newString,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d got %d: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise should still exist in database")
+	}
+	if dbWOExercise.ExerciseID != x.exercise.ID {
+		t.Fatal("exercise ID should not have changed")
+	}
+}
+func TestHandlerUpdateWorkoutExercise_ExerciseNameNotFound(t *testing.T) {
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		ExerciseName string  `json:"exercise_name"`
+		OrderIndex   int32   `json:"order_index"`
+		Notes        *string `json:"notes,omitempty"`
+	}
+	newString := "updated test note"
+	body := requestBody{
+		ExerciseName: "invalid exercise name",
+		OrderIndex:   2,
+		Notes:        &newString,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d got %d: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise should still exist in database")
+	}
+	if dbWOExercise.ExerciseID != x.exercise.ID {
+		t.Fatal("exercise ID should not have changed")
+	}
+}
+func TestHandlerUpdateWorkoutExercise_ExerciseNameOnly_PreservesOtherFields(t *testing.T) {
+	x := testingWorkoutExerciseHandlerSetup(t)
+	newExercise := createTestExercise(t, x.cfg, x.user.ID)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		ExerciseName string `json:"exercise_name"`
+	}
+	body := requestBody{
+		ExerciseName: newExercise.ExerciseName,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("session was not in database")
+	}
+	if dbWOExercise.Notes.String != workoutExercise.Notes.String {
+		t.Fatalf("expected notes %q, got %q", workoutExercise.Notes.String, dbWOExercise.Notes.String)
+	}
+
+	if dbWOExercise.OrderIndex != workoutExercise.OrderIndex {
+		t.Fatalf("expected order index %d, got %d", workoutExercise.OrderIndex, dbWOExercise.OrderIndex)
+	}
+
+	if dbWOExercise.ExerciseID != newExercise.ID {
+		t.Fatalf("expected exercise ID %v, got %v", newExercise.ID, dbWOExercise.ExerciseID)
+	}
+}
+func TestHandlerUpdateWorkoutExercise_OrderIndexNegative(t *testing.T) {
+	t.Skip()
+}
+func TestHandlerUpdateWorkoutExercise_OrderIndexOnly_PreservesOtherFields(t *testing.T) {
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		OrderIndex int32 `json:"order_index"`
+	}
+	body := requestBody{
+		OrderIndex: 2,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise was not in database")
+	}
+	if dbWOExercise.Notes.String != workoutExercise.Notes.String {
+		t.Errorf("expected notes %q, got %q", workoutExercise.Notes.String, dbWOExercise.Notes.String)
+	}
+	if dbWOExercise.OrderIndex != body.OrderIndex {
+		t.Errorf("expected order index %d, got %d", body.OrderIndex, dbWOExercise.OrderIndex)
+	}
+	if dbWOExercise.ExerciseID != x.exercise.ID {
+		t.Errorf("expected exercise id %v, got %v", x.exercise.ID, dbWOExercise.ExerciseID)
+	}
+	if dbWOExercise.OrderIndex == workoutExercise.OrderIndex {
+		t.Fatal("database value did not update")
+	}
+}
+func TestHandlerUpdateWorkoutExercise_ClearNotes(t *testing.T) {
+	t.Skip()
+}
+func TestHandlerUpdateWorkoutExercise_UpdateNotesFromEmpty(t *testing.T) {
+	t.Skip()
+}
+func TestHandlerUpdateWorkoutExercise_NotesOnly_SetNonEmpty_PreservesOtherFields(t *testing.T) {
+	t.Skip()
+}
+func TestHandlerUpdateWorkoutExercise_NotesOmitted_PreservesExistingNotes(t *testing.T) {
+	t.Skip()
+}
+func TestHandlerUpdateWorkoutExercise_UpdateMultipleFields(t *testing.T) {
+	t.Skip()
+}
+func TestHandlerUpdateWorkoutExercise_ResponseBodyMatchesUpdateRecord(t *testing.T) {
+	t.Skip()
+}
+func TestHandlerUpdateWorkoutExercise_ExerciseNameTrimmed(t *testing.T) {
+	x := testingWorkoutExerciseHandlerSetup(t)
+	newExercise := createTestExercise(t, x.cfg, x.user.ID)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	originalExerciseID := workoutExercise.ExerciseID
+	type requestBody struct {
+		ExerciseName string `json:"exercise_name"`
+	}
+	body := requestBody{
+		ExerciseName: "      " + newExercise.ExerciseName + "        ",
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise was not in database")
+	}
+	if dbWOExercise.ExerciseID == originalExerciseID {
+		t.Fatal("expected exercise to change after trimming the exercise name")
+	}
+	if dbWOExercise.ExerciseID != newExercise.ID {
+		t.Fatalf("expected exercise ID %v, got %v", newExercise.ID, dbWOExercise.ExerciseID)
+	}
+}
+func TestHandlerUpdateWorkoutExercise_ExerciseNameInternalWhitespace(t *testing.T) {
+	t.Skip()
+}
+
+//TODO Fully test update
 /*
  *
  *

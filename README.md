@@ -3,6 +3,8 @@
 
 Backend REST API containing 49 endpoints, PostgreSQL persistence, JWT authentication, Dockerized development, and a growing suite of unit tests.
 
+> This project is not finished and is in active development
+
 ## Features
 - 49 REST API endpoints
 - JWT-based authentication
@@ -37,9 +39,8 @@ Technologies:
 - JWT Authentication
 - Docker
 
-> This project is not finished and is in active development
 
-## Motivations
+## Motivation
 Recently, I started focusing more on my personal fitness and wanted a simple way to plan and track my workouts. Most workout apps I tried required expensive monthly subscriptions to create your own workout sessions. I personally do not like doing deadlifts and squats, but every premade session seemed to have these and I couldn't replace them with different exercises. Almost every app on the market currently is heavily focused on AI features like AI calorie detectors and AI generated workout plans. This increased subscription costs while not adding value for the type of workout app I was looking for. So I made my own. 
 
 
