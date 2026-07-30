@@ -250,7 +250,35 @@ func createTestWorkoutExercise(t *testing.T, cfg *apiConfig, session database.Wo
 	})
 	return woExercise
 }
-
+func createTestWorkoutExercise_WithNotes(t *testing.T, cfg *apiConfig, session database.WorkoutSession, exerciseID uuid.UUID) database.WorkoutExercise {
+	t.Helper()
+	noteString := sql.NullString{
+		String: "A note",
+		Valid:  true,
+	}
+	woExercise, err := cfg.db.CreateWorkoutExercises(context.Background(), database.CreateWorkoutExercisesParams{
+		ID:               uuid.New(),
+		WorkoutSessionID: session.ID,
+		ExerciseID:       exerciseID,
+		OrderIndex:       1,
+		Notes:            noteString,
+		CreatedAt:        time.Now().UTC(),
+		UpdatedAt:        time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("failed to create test workout exercise: %v", err)
+	}
+	t.Cleanup(func() {
+		err := cfg.db.DeleteWorkoutExercises(context.Background(), database.DeleteWorkoutExercisesParams{
+			ID:               woExercise.ID,
+			WorkoutSessionID: woExercise.WorkoutSessionID,
+		})
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("cleanup failed: %v", err)
+		}
+	})
+	return woExercise
+}
 func createTestExercise(t *testing.T, cfg *apiConfig, userID uuid.UUID) database.Exercise {
 	t.Helper()
 	exercise, err := cfg.db.CreateExercises(context.Background(), database.CreateExercisesParams{
@@ -293,6 +321,47 @@ func createTestExercise(t *testing.T, cfg *apiConfig, userID uuid.UUID) database
 	return exercise
 }
 
+func createTestExerciseForMiddleWhitespaceTest(t *testing.T, cfg *apiConfig, userID uuid.UUID) database.Exercise {
+	t.Helper()
+	exercise, err := cfg.db.CreateExercises(context.Background(), database.CreateExercisesParams{
+		ID: uuid.New(),
+		UserID: uuid.NullUUID{
+			UUID:  userID,
+			Valid: true,
+		},
+		ExerciseName:  "bench press",
+		TargetMuscles: []string{"chest"},
+		Equipment: sql.NullString{
+			String: "barbell",
+			Valid:  true,
+		},
+		DifficultyLevel: sql.NullString{
+			String: "beginner",
+			Valid:  true,
+		},
+		Description: sql.NullString{
+			String: "test description",
+			Valid:  true,
+		},
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("failed to create test exercise: %v", err)
+	}
+
+	t.Cleanup(func() {
+		err := cfg.db.DeleteExerciseByID(context.Background(), database.DeleteExerciseByIDParams{
+			ID:     exercise.ID,
+			UserID: exercise.UserID,
+		})
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			t.Errorf("failed to cleanup exercise: %v", err)
+		}
+	})
+
+	return exercise
+}
 func createTestWeightSet(t *testing.T, cfg *apiConfig, exercise database.WorkoutExercise) database.WeightsAndSet {
 	t.Helper()
 	weightSet, err := cfg.db.CreateWeightAndSet(context.Background(), database.CreateWeightAndSetParams{

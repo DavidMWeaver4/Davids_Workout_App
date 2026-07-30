@@ -16,10 +16,10 @@ func TestAuthorizeCardioAndSets_Success(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if gotCardioSet.ID != x.cardioSet.ID {
-		t.Fatalf("expected cardio ID %v, got %v", x.cardioSet.ID, gotCardioSet.ID)
+		t.Errorf("expected cardio ID %v, got %v", x.cardioSet.ID, gotCardioSet.ID)
 	}
 	if gotCardioSet.WorkoutExercisesID != x.cardioSet.WorkoutExercisesID {
-		t.Fatalf("expected exercise ID %v, got %v: ", x.cardioSet.WorkoutExercisesID, gotCardioSet.WorkoutExercisesID)
+		t.Errorf("expected exercise ID %v, got %v: ", x.cardioSet.WorkoutExercisesID, gotCardioSet.WorkoutExercisesID)
 	}
 }
 

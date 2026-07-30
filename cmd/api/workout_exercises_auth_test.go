@@ -19,11 +19,11 @@ func TestAuthorizeWorkoutExercise_Success(t *testing.T) {
 	}
 
 	if gotWOExercise.ID != x.woExercise.ID {
-		t.Fatalf("expected exercise ID %v, got %v", x.woExercise.ID, gotWOExercise.ID)
+		t.Errorf("expected exercise ID %v, got %v", x.woExercise.ID, gotWOExercise.ID)
 	}
 
 	if gotWOExercise.WorkoutSessionID != x.session.ID {
-		t.Fatalf("expected session ID %v, got %v", x.session.ID, gotWOExercise.WorkoutSessionID)
+		t.Errorf("expected session ID %v, got %v", x.session.ID, gotWOExercise.WorkoutSessionID)
 	}
 }
 

@@ -17,13 +17,13 @@ func TestAuthorizeExercise_Success(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if gotExercise.ID != x.exercise.ID {
-		t.Fatalf("expected exercise ID %v, got %v", x.exercise.ID, gotExercise.ID)
+		t.Errorf("expected exercise ID %v, got %v", x.exercise.ID, gotExercise.ID)
 	}
 	if !gotExercise.UserID.Valid {
-		t.Fatalf("expected exercise to have a valid UserID, got null")
+		t.Errorf("expected exercise to have a valid UserID, got null")
 	}
 	if gotExercise.UserID.UUID != x.user.ID {
-		t.Fatalf("expected exercise UserID %v, got %v", x.user.ID, gotExercise.UserID.UUID)
+		t.Errorf("expected exercise UserID %v, got %v", x.user.ID, gotExercise.UserID.UUID)
 	}
 }
 

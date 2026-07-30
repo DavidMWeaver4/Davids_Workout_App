@@ -40,17 +40,14 @@ func TestHandlerCreateExercise_Success(t *testing.T) {
 	response := testingDecodeJSONResponse[exercise](t, rr)
 
 	if response.ExerciseName != body.ExerciseName {
-		t.Fatalf("expected %s, got %s", body.ExerciseName, response.ExerciseName)
+		t.Errorf("expected %s, got %s", body.ExerciseName, response.ExerciseName)
 	}
 
 	if len(response.TargetMuscles) != 1 {
-		t.Fatal("expected 1 target muscle")
+		t.Errorf("expected 1 target muscle")
 	}
 
 	dbExercise, err := x.cfg.db.GetExerciseFromID(context.Background(), response.ID)
-	if err != nil {
-		t.Fatalf("GetExerciseFromID failed: %v", err)
-	}
 	t.Cleanup(func() {
 		x.cfg.db.DeleteExerciseByID(context.Background(), database.DeleteExerciseByIDParams{
 			ID: response.ID,
@@ -61,9 +58,12 @@ func TestHandlerCreateExercise_Success(t *testing.T) {
 		},
 		)
 	})
+	if err != nil {
+		t.Fatalf("GetExerciseFromID failed: %v", err)
+	}
 
 	if dbExercise.ExerciseName != body.ExerciseName {
-		t.Fatal("database value does not match entry data")
+		t.Errorf("database value does not match entry data")
 	}
 }
 
@@ -100,7 +100,7 @@ func TestHandlerGetExerciseFromID_Success(t *testing.T) {
 	}
 	response := testingDecodeJSONResponse[exercise](t, rr)
 	if response.ID != exerciseToFind.ID {
-		t.Fatalf("expected exercise ID %v, to match %v", response.ID, exerciseToFind.ID)
+		t.Errorf("expected exercise ID %v, to match %v", response.ID, exerciseToFind.ID)
 	}
 }
 
@@ -120,7 +120,7 @@ func TestHandlerSearchExercises_Success(t *testing.T) {
 	response := testingDecodeJSONResponse[[]exercise](t, rr)
 
 	if len(response) == 0 {
-		t.Fatal("expected at least one exercise")
+		t.Errorf("expected at least one exercise")
 	}
 
 	found := false
@@ -132,7 +132,7 @@ func TestHandlerSearchExercises_Success(t *testing.T) {
 	}
 
 	if !found {
-		t.Fatal("created exercise was not returned")
+		t.Errorf("created exercise was not returned")
 	}
 }
 func TestHandlerUpdateExercise_Success(t *testing.T) {
@@ -171,11 +171,17 @@ func TestHandlerUpdateExercise_Success(t *testing.T) {
 		t.Fatal("exercise was not updated in database")
 	}
 
-	if dbExercise.ExerciseName != body.ExerciseName ||
-		dbExercise.Equipment.String != body.Equipment ||
-		dbExercise.Description.String != body.Description ||
-		dbExercise.DifficultyLevel.String != body.DifficultyLevel {
-		t.Fatal("database value does not match entry data")
+	if dbExercise.ExerciseName != body.ExerciseName {
+		t.Errorf("database exercise name does not match entry data")
+	}
+	if dbExercise.Equipment.String != body.Equipment {
+		t.Errorf("database equipment does not match entry data")
+	}
+	if dbExercise.Description.String != body.Description {
+		t.Errorf("database description does not match entry data")
+	}
+	if dbExercise.DifficultyLevel.String != body.DifficultyLevel {
+		t.Errorf("database difficulty level does not match entry data")
 	}
 }
 
@@ -191,8 +197,6 @@ func testingExerciseHandlerSetup(t *testing.T) ExerciseHandlerFixture {
 	cfg := newTestAPIConfig(t)
 	user := createTestUser(t, cfg)
 	token := testingCreateJWT(t, cfg, user.ID)
-	t.Logf("user id: %v", user.ID)
-	t.Logf("cfg nil: %v", cfg == nil)
 	return ExerciseHandlerFixture{
 		ctx:   context.Background(),
 		cfg:   cfg,

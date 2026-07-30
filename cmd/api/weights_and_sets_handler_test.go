@@ -39,16 +39,16 @@ func TestHandlerCreateWeightAndSets_Success(t *testing.T) {
 	}
 	response := testingDecodeJSONResponse[weightAndSets](t, rr)
 	if response.Weight != body.Weight {
-		t.Fatalf("expected %.2f, got %.2f", body.Weight, response.Weight)
+		t.Errorf("expected %.2f, got %.2f", body.Weight, response.Weight)
 	}
 	if response.DurationSeconds == nil {
 		t.Fatalf("expected DurationSeconds %d, got nil", body.DurationSeconds)
 	}
 	if *response.DurationSeconds != body.DurationSeconds {
-		t.Fatalf("expected %d, got %d", body.DurationSeconds, *response.DurationSeconds)
+		t.Errorf("expected %d, got %d", body.DurationSeconds, *response.DurationSeconds)
 	}
 	if response.WorkoutExercisesID != x.workoutExercise.ID {
-		t.Fatalf("got wrong session id, expected %v, got %v", x.workoutExercise.ID, response.WorkoutExercisesID)
+		t.Errorf("got wrong session id, expected %v, got %v", x.workoutExercise.ID, response.WorkoutExercisesID)
 	}
 	dbWeightSet, err := x.cfg.db.GetWeightAndSetFromID(context.Background(), response.ID)
 	t.Cleanup(func() {
@@ -61,7 +61,7 @@ func TestHandlerCreateWeightAndSets_Success(t *testing.T) {
 		t.Fatal("weight set was not inserted into database")
 	}
 	if dbWeightSet.RepsActual != body.RepsActual {
-		t.Fatal("database value does not match entry data")
+		t.Errorf("database value does not match entry data")
 	}
 }
 
@@ -81,7 +81,7 @@ func TestHandlerGetAllSetsFromSession_Success(t *testing.T) {
 	}
 	response := testingDecodeJSONResponse[[]weightAndSets](t, rr)
 	if len(response) != 2 {
-		t.Fatalf("expected 2 sets got %d", len(response))
+		t.Errorf("expected 2 sets got %d", len(response))
 	}
 	expectedIDs := map[uuid.UUID]bool{set1.ID: false, set2.ID: false}
 	for _, item := range response {
@@ -90,7 +90,7 @@ func TestHandlerGetAllSetsFromSession_Success(t *testing.T) {
 		}
 	}
 	if expectedIDs[set1.ID] != true || expectedIDs[set2.ID] != true {
-		t.Fatal("did not find correct sets")
+		t.Errorf("did not find correct sets")
 	}
 }
 func TestHandlerGetTotalDuration_Success(t *testing.T) {
@@ -110,7 +110,7 @@ func TestHandlerGetTotalDuration_Success(t *testing.T) {
 	expected := set.DurationSeconds.Int32 + set.RestTimeSeconds.Int32
 
 	if response.TotalSeconds != expected {
-		t.Fatalf("expected duration %d got %d", expected, response.TotalSeconds)
+		t.Errorf("expected duration %d got %d", expected, response.TotalSeconds)
 	}
 }
 func TestHandlerGetVolumeSet_Success(t *testing.T) {
@@ -129,7 +129,7 @@ func TestHandlerGetVolumeSet_Success(t *testing.T) {
 	expectedVolume := weightSet.Weight * float64(weightSet.RepsActual)
 
 	if response.Volume != expectedVolume {
-		t.Fatalf("expected %.2f got %.2f", expectedVolume, response.Volume)
+		t.Errorf("expected %.2f got %.2f", expectedVolume, response.Volume)
 	}
 }
 func TestHandlerGetTotalVolumeFromExerciseSets_Success(t *testing.T) {
@@ -151,7 +151,7 @@ func TestHandlerGetTotalVolumeFromExerciseSets_Success(t *testing.T) {
 	expected := (set1.Weight * float64(set1.RepsActual)) + (set2.Weight * float64(set2.RepsActual))
 
 	if response.Volume != expected {
-		t.Fatalf("expected volume %.2f got %.2f", expected, response.Volume)
+		t.Errorf("expected volume %.2f got %.2f", expected, response.Volume)
 	}
 }
 func TestHandlerGetTotalSessionVolume_Success(t *testing.T) {
@@ -179,7 +179,7 @@ func TestHandlerGetTotalSessionVolume_Success(t *testing.T) {
 	expected := (set1.Weight * float64(set1.RepsActual)) + (set2.Weight * float64(set2.RepsActual))
 
 	if response.Volume != expected {
-		t.Fatalf("expected volume %.2f got %.2f", expected, response.Volume)
+		t.Errorf("expected volume %.2f got %.2f", expected, response.Volume)
 	}
 }
 func TestHandlerGetTotalDurationForExercise_Success(t *testing.T) {
@@ -201,7 +201,7 @@ func TestHandlerGetTotalDurationForExercise_Success(t *testing.T) {
 	expected := set1.DurationSeconds.Int32 + set1.RestTimeSeconds.Int32 + set2.DurationSeconds.Int32 + set2.RestTimeSeconds.Int32
 
 	if response.TotalSeconds != expected {
-		t.Fatalf("expected duration %d got %d", expected, response.TotalSeconds)
+		t.Errorf("expected duration %d got %d", expected, response.TotalSeconds)
 	}
 }
 func TestHandlerUpdateWeightAndSet_Success(t *testing.T) {
@@ -242,7 +242,7 @@ func TestHandlerUpdateWeightAndSet_Success(t *testing.T) {
 	response := testingDecodeJSONResponse[weightAndSets](t, rr)
 
 	if response.Weight != body.Weight {
-		t.Fatalf("expected weight %.2f got %.2f", body.Weight, response.Weight)
+		t.Errorf("expected weight %.2f got %.2f", body.Weight, response.Weight)
 	}
 
 	dbSet, err := x.cfg.db.GetWeightAndSetFromID(context.Background(), set.ID)
@@ -251,8 +251,17 @@ func TestHandlerUpdateWeightAndSet_Success(t *testing.T) {
 		t.Fatal("failed retrieving updated set")
 	}
 
-	if dbSet.Weight != body.Weight || dbSet.RepsActual != body.RepsActual || dbSet.RepsTarget != body.RepsTarget || dbSet.SetNumber != body.SetNumber {
-		t.Fatal("database values do not match update body")
+	if dbSet.Weight != body.Weight {
+		t.Errorf("database Weight does not match update body")
+	}
+	if dbSet.RepsActual != body.RepsActual {
+		t.Errorf("database RepsActual does not match update body")
+	}
+	if dbSet.RepsTarget != body.RepsTarget {
+		t.Errorf("database RepsTarget does not match update body")
+	}
+	if dbSet.SetNumber != body.SetNumber {
+		t.Errorf("database SetNumber does not match update body")
 	}
 }
 func TestHandlerDeleteWeightAndSet_Success(t *testing.T) {

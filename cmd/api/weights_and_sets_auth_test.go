@@ -17,10 +17,10 @@ func TestAuthorizeWeightAndSets_Success(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if gotWeightSet.ID != x.weightSet.ID {
-		t.Fatalf("expected weight set ID %v, got %v", x.weightSet.ID, gotWeightSet.ID)
+		t.Errorf("expected weight set ID %v, got %v", x.weightSet.ID, gotWeightSet.ID)
 	}
 	if gotWeightSet.WorkoutExercisesID != x.weightSet.WorkoutExercisesID {
-		t.Fatalf("expected exercise ID %v, got %v: ", x.weightSet.WorkoutExercisesID, gotWeightSet.WorkoutExercisesID)
+		t.Errorf("expected exercise ID %v, got %v: ", x.weightSet.WorkoutExercisesID, gotWeightSet.WorkoutExercisesID)
 	}
 }
 

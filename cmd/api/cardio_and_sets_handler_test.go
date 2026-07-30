@@ -34,22 +34,22 @@ func TestHandlerCreateCardioSet_Success(t *testing.T) {
 	}
 	response := testingDecodeJSONResponse[cardioAndSets](t, rr)
 	if response.Distance == nil {
-		t.Fatalf("expected distance %.2f, got nil", body.Distance)
+		t.Errorf("expected distance %.2f, got nil", body.Distance)
 	}
 	if *response.Distance != body.Distance {
-		t.Fatalf("expected %.2f, got %.2f", body.Distance, *response.Distance)
+		t.Errorf("expected %.2f, got %.2f", body.Distance, *response.Distance)
 	}
 	if response.DurationSeconds == nil {
-		t.Fatalf("expected DurationSeconds %d, got nil", body.DurationSeconds)
+		t.Errorf("expected DurationSeconds %d, got nil", body.DurationSeconds)
 	}
 	if *response.DurationSeconds != body.DurationSeconds {
-		t.Fatalf("expected %d, got %d", body.DurationSeconds, *response.DurationSeconds)
+		t.Errorf("expected %d, got %d", body.DurationSeconds, *response.DurationSeconds)
 	}
 	if response.WorkoutExercisesID != x.workoutExercise.ID {
-		t.Fatalf("got wrong session id, expected %v, got %v", x.workoutExercise.ID, response.WorkoutExercisesID)
+		t.Errorf("got wrong session id, expected %v, got %v", x.workoutExercise.ID, response.WorkoutExercisesID)
 	}
 	if response.SetNumber != body.SetNumber {
-		t.Fatalf("expected set number %d got %d", body.SetNumber, response.SetNumber)
+		t.Errorf("expected set number %d got %d", body.SetNumber, response.SetNumber)
 	}
 	dbCardioSet, err := x.cfg.db.GetCardioSetFromID(context.Background(), response.ID)
 	t.Cleanup(func() {
@@ -62,7 +62,7 @@ func TestHandlerCreateCardioSet_Success(t *testing.T) {
 		t.Fatal("cardio set was not inserted into database")
 	}
 	if dbCardioSet.Distance.Float64 != body.Distance {
-		t.Fatal("database values does not match entry data")
+		t.Errorf("database values does not match entry data")
 	}
 }
 

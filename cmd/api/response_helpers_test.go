@@ -33,7 +33,7 @@ func TestRespondWithError(t *testing.T) {
 	decodeResponseBody(t, result, &body)
 
 	if body.Error != "something went wrong" {
-		t.Fatalf("expected error message 'something went wrong', got %q", body.Error)
+		t.Errorf("expected error message 'something went wrong', got %q", body.Error)
 	}
 }
 
@@ -52,7 +52,7 @@ func TestRespondWithAuthError_NotFound(t *testing.T) {
 	decodeResponseBody(t, result, &body)
 
 	if body.Error != "Resource not found" {
-		t.Fatalf("expected error message 'Resource not found', got %q", body.Error)
+		t.Errorf("expected error message 'Resource not found', got %q", body.Error)
 	}
 }
 
@@ -72,7 +72,7 @@ func TestRespondWithAuthError_Forbidden(t *testing.T) {
 	decodeResponseBody(t, result, &body)
 
 	if body.Error != "Access denied" {
-		t.Fatalf("expected error message 'Access denied', got %q", body.Error)
+		t.Errorf("expected error message 'Access denied', got %q", body.Error)
 	}
 }
 func TestRespondWithAuthError_Unknown(t *testing.T) {
@@ -90,7 +90,7 @@ func TestRespondWithAuthError_Unknown(t *testing.T) {
 	decodeResponseBody(t, result, &body)
 
 	if body.Error != "Authorization failed" {
-		t.Fatalf("expected error message 'Authorization failed', got %q", body.Error)
+		t.Errorf("expected error message 'Authorization failed', got %q", body.Error)
 	}
 
 }
@@ -111,7 +111,7 @@ func TestRespondWithJSON(t *testing.T) {
 	decodeResponseBody(t, result, &body)
 
 	if body.Message != "working" {
-		t.Fatalf("expected message 'working', got %q", body.Message)
+		t.Errorf("expected message 'working', got %q", body.Message)
 	}
 }
 func TestRespondWithJSON_ContentType(t *testing.T) {
@@ -125,7 +125,7 @@ func TestRespondWithJSON_ContentType(t *testing.T) {
 	contentType := result.Header.Get("Content-Type")
 
 	if contentType != "application/json" {
-		t.Fatalf("expected content type application/json, got %q", contentType)
+		t.Errorf("expected content type application/json, got %q", contentType)
 	}
 }
 

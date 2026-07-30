@@ -41,7 +41,7 @@ func TestHandlerCreateWorkoutSession_Success(t *testing.T) {
 		t.Fatalf("expected %s, got %v", body.Notes, response.Notes)
 	}
 	if response.UserID != x.user.ID {
-		t.Fatalf("got wrong user ID, expected %v, got %v", x.user.ID, response.UserID)
+		t.Errorf("got wrong user ID, expected %v, got %v", x.user.ID, response.UserID)
 	}
 	dbWorkoutSession, err := x.cfg.db.GetWorkoutSessionByID(context.Background(), response.ID)
 	t.Cleanup(func() {
@@ -54,7 +54,7 @@ func TestHandlerCreateWorkoutSession_Success(t *testing.T) {
 		t.Fatal("workout session was not inserted into database")
 	}
 	if dbWorkoutSession.Description.String != body.Description {
-		t.Fatal("database value does not match entry data")
+		t.Errorf("database value does not match entry data")
 	}
 }
 
@@ -104,7 +104,7 @@ func TestHandlerGetAllMyWorkoutSessions_Success(t *testing.T) {
 
 	for id, found := range expectedIDs {
 		if !found {
-			t.Fatalf("expected session %v in response, but it was not found", id)
+			t.Errorf("expected session %v in response, but it was not found", id)
 		}
 	}
 
@@ -125,7 +125,7 @@ func TestHandlerGetWorkoutSessionsByID_Success(t *testing.T) {
 	response := testingDecodeJSONResponse[workoutSessions](t, rr)
 
 	if response.ID != sessionToFind.ID {
-		t.Fatalf("expected session ID %v, to match %v", response.ID, sessionToFind.ID)
+		t.Errorf("expected session ID %v, to match %v", response.ID, sessionToFind.ID)
 	}
 }
 
@@ -156,9 +156,11 @@ func TestHandlerUpdateWorkoutSession_Success(t *testing.T) {
 	if err != nil {
 		t.Fatal("session was not updated in database")
 	}
-	if dbSession.Description.String != body.Description ||
-		dbSession.Notes.String != body.Notes {
-		t.Fatal("database value does not match entry data")
+	if dbSession.Description.String != body.Description {
+		t.Errorf("database Description did not match entry data")
+	}
+	if dbSession.Notes.String != body.Notes {
+		t.Errorf("database notes does not match entry data")
 	}
 
 }
@@ -177,10 +179,10 @@ func TestHandlerGetMyLastSession_Success(t *testing.T) {
 	}
 	response := testingDecodeJSONResponse[workoutSessions](t, rr)
 	if response.ID == sessionToNotGet.ID {
-		t.Fatal("expected last session, got first session")
+		t.Errorf("expected last session, got first session")
 	}
 	if response.ID != lastSession.ID {
-		t.Fatalf("expected session id %v, got %v", lastSession.ID, response.ID)
+		t.Errorf("expected session id %v, got %v", lastSession.ID, response.ID)
 	}
 }
 func TestHandlerGetMyXNumberLastSessions_Success(t *testing.T) {
@@ -212,13 +214,13 @@ func TestHandlerGetMyXNumberLastSessions_Success(t *testing.T) {
 			expectedIDs[rep.ID] = true
 		}
 		if rep.ID == sessionToNotGet.ID {
-			t.Fatalf("got wrong sessions")
+			t.Errorf("got wrong sessions")
 		}
 	}
 
 	for id, found := range expectedIDs {
 		if !found {
-			t.Fatalf("expected session %v in response, but it was not found", id)
+			t.Errorf("expected session %v in response, but it was not found", id)
 		}
 	}
 }
@@ -240,7 +242,7 @@ func TestHandlerCountSessions_Success(t *testing.T) {
 	response := testingDecodeJSONResponse[countResponse](t, rr)
 
 	if response.Count != 4 {
-		t.Fatalf("expected 4, got %d", response.Count)
+		t.Errorf("expected 4, got %d", response.Count)
 	}
 
 }
@@ -262,7 +264,7 @@ func TestHandlerSearchWOSByDescription_Success(t *testing.T) {
 
 	for _, rep := range response {
 		if rep.ID == session1.ID || rep.ID == session2.ID || rep.ID == session3.ID {
-			t.Fatalf("got unexpected session in results: %v", rep.ID)
+			t.Errorf("got unexpected session in results: %v", rep.ID)
 		}
 	}
 	found := false
@@ -273,10 +275,10 @@ func TestHandlerSearchWOSByDescription_Success(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatal("expected session was not returned")
+		t.Errorf("expected session was not returned")
 	}
 }
-func TestHandlerSearchWOSByDateRange_Sucess(t *testing.T) {
+func TestHandlerSearchWOSByDateRange_Success(t *testing.T) {
 	x := testingWorkoutSessionHandlerSetup(t)
 
 	_ = createTestWorkoutSessionWithDate(t, x.cfg, x.user.ID, time.Now().UTC().Add(-24*time.Hour))
@@ -300,14 +302,14 @@ func TestHandlerSearchWOSByDateRange_Sucess(t *testing.T) {
 	response := testingDecodeJSONResponse[[]workoutSessions](t, rr)
 
 	if len(response) != 3 {
-		t.Fatalf("expected 3 sessions got %d", len(response))
+		t.Errorf("expected 3 sessions got %d", len(response))
 	}
 	for _, rep := range response {
 		if rep.WorkoutDate.Before(startTime) || rep.WorkoutDate.After(endTime) {
-			t.Fatalf("session %v has date %v outside expected range", rep.ID, rep.WorkoutDate)
+			t.Errorf("session %v has date %v outside expected range", rep.ID, rep.WorkoutDate)
 		}
 		if rep.ID == sessionOutOfRange.ID {
-			t.Fatal("session outside date range was returned")
+			t.Errorf("session outside date range was returned")
 		}
 	}
 

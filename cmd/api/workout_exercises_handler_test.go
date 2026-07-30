@@ -33,13 +33,13 @@ func TestHandlerCreateWorkoutExercise_Success(t *testing.T) {
 
 	response := testingDecodeJSONResponse[workoutExercise](t, rr)
 	if response.Notes == nil || *response.Notes != body.Notes {
-		t.Fatalf("expected %s, got %v", body.Notes, response.Notes)
+		t.Errorf("expected %s, got %v", body.Notes, response.Notes)
 	}
 	if response.WorkoutSessionID != x.workoutSession.ID {
-		t.Fatalf("got wrong session ID, expected %v, got %v", x.workoutSession.ID, response.WorkoutSessionID)
+		t.Errorf("got wrong session ID, expected %v, got %v", x.workoutSession.ID, response.WorkoutSessionID)
 	}
 	if response.OrderIndex != 0 {
-		t.Fatalf("expect order 0, got %v", response.OrderIndex)
+		t.Errorf("expect order 0, got %v", response.OrderIndex)
 	}
 	dbWorkoutExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), response.ID)
 	t.Cleanup(func() {
@@ -52,7 +52,7 @@ func TestHandlerCreateWorkoutExercise_Success(t *testing.T) {
 		t.Fatal("workout exercise was not inserted into database")
 	}
 	if dbWorkoutExercise.Notes.String != body.Notes {
-		t.Fatal("database value does not match entry data")
+		t.Errorf("database value does not match entry data")
 	}
 }
 func TestHandlerGetWorkoutExercise_Success(t *testing.T) {
@@ -68,7 +68,7 @@ func TestHandlerGetWorkoutExercise_Success(t *testing.T) {
 	response := testingDecodeJSONResponse[workoutExercise](t, rr)
 
 	if response.ID != exerciseToFind.ID {
-		t.Fatalf("expected session ID %v, to match %v", response.ID, exerciseToFind.ID)
+		t.Errorf("expected session ID %v, to match %v", response.ID, exerciseToFind.ID)
 	}
 }
 
@@ -94,7 +94,7 @@ func TestHandlerGetWorkoutExercisesInSession_Success(t *testing.T) {
 		}
 	}
 	if expectedIDs[workoutExercise1.ID] != true || expectedIDs[workoutExercise2.ID] != true {
-		t.Fatal("did not find correct workout exercises")
+		t.Errorf("did not find correct workout exercises")
 	}
 }
 
@@ -127,7 +127,7 @@ func TestHandlerGetNumOfWorkoutsInSession_Success(t *testing.T) {
 	}
 	response := testingDecodeJSONResponse[countResponse](t, rr)
 	if response.Count != 2 {
-		t.Fatalf("got unexpected length: %d", response.Count)
+		t.Errorf("got unexpected length: %d", response.Count)
 	}
 }
 
@@ -169,13 +169,92 @@ func TestHandlerUpdateWorkoutExercise_Success(t *testing.T) {
 	}
 }
 func TestHandlerUpdateWorkoutExercise_Unauthorized(t *testing.T) {
-	t.Skip()
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		OrderIndex int32 `json:"order_index"`
+	}
+	body := requestBody{
+		OrderIndex: 1,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, "")
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d got %d: %s", http.StatusUnauthorized, rr.Code, rr.Body.String())
+	}
+
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise should still exist in database")
+	}
+	if dbWOExercise.OrderIndex != workoutExercise.OrderIndex {
+		t.Errorf("order index should not have changed")
+	}
+	if dbWOExercise.ExerciseID != workoutExercise.ExerciseID {
+		t.Errorf("exercise ID should not have changed")
+	}
+	if dbWOExercise.Notes.String != workoutExercise.Notes.String {
+		t.Errorf("notes should not have changed")
+	}
 }
 func TestHandlerUpdateWorkoutExercise_Forbidden(t *testing.T) {
-	t.Skip()
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	newCfg := newTestAPIConfig(t)
+	newUser := createTestUser(t, newCfg)
+	newToken := testingCreateJWT(t, newCfg, newUser.ID)
+	type requestBody struct {
+		OrderIndex int32 `json:"order_index"`
+	}
+	body := requestBody{
+		OrderIndex: 1,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, newToken)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("expected status %d got %d: %s", http.StatusForbidden, rr.Code, rr.Body.String())
+	}
+
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise should still exist in database")
+	}
+	if dbWOExercise.OrderIndex != workoutExercise.OrderIndex {
+		t.Errorf("order index should not have changed")
+	}
+	if dbWOExercise.ExerciseID != workoutExercise.ExerciseID {
+		t.Errorf("exercise ID should not have changed")
+	}
+	if dbWOExercise.Notes.String != workoutExercise.Notes.String {
+		t.Errorf("notes should not have changed")
+	}
 }
 func TestHandlerUpdateWorkoutExercise_NotFound(t *testing.T) {
-	t.Skip()
+	x := testingWorkoutExerciseHandlerSetup(t)
+	newExercise := createTestExercise(t, x.cfg, x.user.ID)
+	type requestBody struct {
+		ExerciseName string  `json:"exercise_name"`
+		OrderIndex   int32   `json:"order_index"`
+		Notes        *string `json:"notes,omitempty"`
+	}
+	newString := "updated test note"
+	body := requestBody{
+		ExerciseName: newExercise.ExerciseName,
+		OrderIndex:   2,
+		Notes:        &newString,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	nonExistentID := uuid.New()
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+nonExistentID.String(), JSONBody, x.token)
+	req.SetPathValue("id", nonExistentID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d got %d: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
 }
 func TestHandlerUpdateWorkoutExercise_InvalidWorkoutExerciseID(t *testing.T) {
 	x := testingWorkoutExerciseHandlerSetup(t)
@@ -204,7 +283,7 @@ func TestHandlerUpdateWorkoutExercise_InvalidWorkoutExerciseID(t *testing.T) {
 		t.Fatal("workout exercise should still exist in database")
 	}
 	if dbWOExercise.ExerciseID != x.exercise.ID {
-		t.Fatal("exercise ID should not have changed")
+		t.Errorf("exercise ID should not have changed")
 	}
 }
 func TestHandlerUpdateWorkoutExercise_InvalidJSON(t *testing.T) {
@@ -223,15 +302,13 @@ func TestHandlerUpdateWorkoutExercise_InvalidJSON(t *testing.T) {
 	}
 
 	if dbWOExercise.ExerciseID != workoutExercise.ExerciseID {
-		t.Fatal("exercise should not have been modified")
+		t.Errorf("exercise should not have been modified")
 	}
-
 	if dbWOExercise.OrderIndex != workoutExercise.OrderIndex {
-		t.Fatal("order index should not have been modified")
+		t.Errorf("order index should not have been modified")
 	}
-
 	if dbWOExercise.Notes.String != workoutExercise.Notes.String {
-		t.Fatal("notes should not have been modified")
+		t.Errorf("notes should not have been modified")
 	}
 }
 func TestHandlerUpdateWorkoutExercise_NoFieldsProvided(t *testing.T) {
@@ -254,17 +331,14 @@ func TestHandlerUpdateWorkoutExercise_NoFieldsProvided(t *testing.T) {
 	if err != nil {
 		t.Fatal("workout exercise should still exist")
 	}
-
 	if dbWOExercise.ExerciseID != workoutExercise.ExerciseID {
-		t.Fatal("exercise should not have been modified")
+		t.Errorf("exercise should not have been modified")
 	}
-
 	if dbWOExercise.OrderIndex != workoutExercise.OrderIndex {
-		t.Fatal("order index should not have been modified")
+		t.Errorf("order index should not have been modified")
 	}
-
 	if dbWOExercise.Notes.String != workoutExercise.Notes.String {
-		t.Fatal("notes should not have been modified")
+		t.Errorf("notes should not have been modified")
 	}
 }
 func TestHandlerUpdateWorkoutExercise_ExerciseNameEmpty(t *testing.T) {
@@ -293,7 +367,7 @@ func TestHandlerUpdateWorkoutExercise_ExerciseNameEmpty(t *testing.T) {
 		t.Fatal("workout exercise should still exist in database")
 	}
 	if dbWOExercise.ExerciseID != x.exercise.ID {
-		t.Fatal("exercise ID should not have changed")
+		t.Errorf("exercise ID should not have changed")
 	}
 }
 func TestHandlerUpdateWorkoutExercise_ExerciseNameNotFound(t *testing.T) {
@@ -322,7 +396,7 @@ func TestHandlerUpdateWorkoutExercise_ExerciseNameNotFound(t *testing.T) {
 		t.Fatal("workout exercise should still exist in database")
 	}
 	if dbWOExercise.ExerciseID != x.exercise.ID {
-		t.Fatal("exercise ID should not have changed")
+		t.Errorf("exercise ID should not have changed")
 	}
 }
 func TestHandlerUpdateWorkoutExercise_ExerciseNameOnly_PreservesOtherFields(t *testing.T) {
@@ -345,22 +419,41 @@ func TestHandlerUpdateWorkoutExercise_ExerciseNameOnly_PreservesOtherFields(t *t
 
 	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
 	if err != nil {
-		t.Fatal("session was not in database")
+		t.Fatal("workout exercise was not in database")
 	}
 	if dbWOExercise.Notes.String != workoutExercise.Notes.String {
-		t.Fatalf("expected notes %q, got %q", workoutExercise.Notes.String, dbWOExercise.Notes.String)
+		t.Errorf("expected notes %q, got %q", workoutExercise.Notes.String, dbWOExercise.Notes.String)
 	}
-
 	if dbWOExercise.OrderIndex != workoutExercise.OrderIndex {
-		t.Fatalf("expected order index %d, got %d", workoutExercise.OrderIndex, dbWOExercise.OrderIndex)
+		t.Errorf("expected order index %d, got %d", workoutExercise.OrderIndex, dbWOExercise.OrderIndex)
 	}
-
 	if dbWOExercise.ExerciseID != newExercise.ID {
-		t.Fatalf("expected exercise ID %v, got %v", newExercise.ID, dbWOExercise.ExerciseID)
+		t.Errorf("expected workout exercise ID %v, got %v", newExercise.ID, dbWOExercise.ExerciseID)
 	}
 }
 func TestHandlerUpdateWorkoutExercise_OrderIndexNegative(t *testing.T) {
-	t.Skip()
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		OrderIndex int32 `json:"order_index"`
+	}
+	body := requestBody{
+		OrderIndex: -1,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("expected status to be %d got %d: %s", http.StatusBadRequest, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise was not in database")
+	}
+	if dbWOExercise.OrderIndex == body.OrderIndex {
+		t.Errorf("expected negative order index to not be stored")
+	}
 }
 func TestHandlerUpdateWorkoutExercise_OrderIndexOnly_PreservesOtherFields(t *testing.T) {
 	x := testingWorkoutExerciseHandlerSetup(t)
@@ -393,26 +486,210 @@ func TestHandlerUpdateWorkoutExercise_OrderIndexOnly_PreservesOtherFields(t *tes
 		t.Errorf("expected exercise id %v, got %v", x.exercise.ID, dbWOExercise.ExerciseID)
 	}
 	if dbWOExercise.OrderIndex == workoutExercise.OrderIndex {
-		t.Fatal("database value did not update")
+		t.Errorf("database value did not update")
 	}
 }
 func TestHandlerUpdateWorkoutExercise_ClearNotes(t *testing.T) {
-	t.Skip()
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		Notes *string `json:"notes,omitempty"`
+	}
+	empty := ""
+	body := requestBody{
+		Notes: &empty,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise was not in database")
+	}
+	if dbWOExercise.Notes.Valid != false {
+		t.Errorf("expected notes to not be valid, got %v", dbWOExercise.Notes.Valid)
+	}
+	if dbWOExercise.Notes.String != "" {
+		t.Errorf("expected notes to be empty, got %s", dbWOExercise.Notes.String)
+	}
 }
 func TestHandlerUpdateWorkoutExercise_UpdateNotesFromEmpty(t *testing.T) {
-	t.Skip()
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		Notes *string `json:"notes,omitempty"`
+	}
+	newNote := "new note"
+	body := requestBody{
+		Notes: &newNote,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise was not in database")
+	}
+	if !dbWOExercise.Notes.Valid {
+		t.Errorf("expected notes to be valid, got %v", dbWOExercise.Notes.Valid)
+	}
+	if dbWOExercise.Notes.String != newNote {
+		t.Errorf("expected notes to be updated, got %s", dbWOExercise.Notes.String)
+	}
 }
 func TestHandlerUpdateWorkoutExercise_NotesOnly_SetNonEmpty_PreservesOtherFields(t *testing.T) {
-	t.Skip()
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	newNote := "updated note testing"
+	type requestBody struct {
+		Notes *string `json:"notes"`
+	}
+	body := requestBody{
+		Notes: &newNote,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise was not in database")
+	}
+	if dbWOExercise.Notes.String != newNote {
+		t.Errorf("notes not updated")
+	}
+	if dbWOExercise.ExerciseID != workoutExercise.ExerciseID {
+		t.Errorf("exercise changed unexpectedly")
+	}
+	if dbWOExercise.OrderIndex != workoutExercise.OrderIndex {
+		t.Errorf("order index changed unexpectedly")
+	}
 }
 func TestHandlerUpdateWorkoutExercise_NotesOmitted_PreservesExistingNotes(t *testing.T) {
-	t.Skip()
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise_WithNotes(t, x.cfg, x.workoutSession, x.exercise.ID)
+	preservedNotes := workoutExercise.Notes.String
+	type requestBody struct {
+		ExerciseName string  `json:"exercise_name"`
+		OrderIndex   int32   `json:"order_index"`
+		Notes        *string `json:"notes,omitempty"`
+	}
+	body := requestBody{
+		ExerciseName: x.exercise.ExerciseName,
+		OrderIndex:   workoutExercise.OrderIndex,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatalf("workout exercise was not in database")
+	}
+	if dbWOExercise.Notes.Valid == false {
+		t.Errorf("expected notes to be valid, got %v", dbWOExercise.Notes.Valid)
+	}
+	if dbWOExercise.Notes.String != preservedNotes {
+		t.Errorf("expected notes to be 'A note', got %s", dbWOExercise.Notes.String)
+	}
 }
 func TestHandlerUpdateWorkoutExercise_UpdateMultipleFields(t *testing.T) {
-	t.Skip()
+	x := testingWorkoutExerciseHandlerSetup(t)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	newExercise := createTestExercise(t, x.cfg, x.user.ID)
+	newNote := "updated"
+	order := int32(5)
+
+	type requestBody struct {
+		ExerciseName string  `json:"exercise_name"`
+		OrderIndex   *int32  `json:"order_index"`
+		Notes        *string `json:"notes"`
+	}
+	body := requestBody{
+		ExerciseName: newExercise.ExerciseName,
+		OrderIndex:   &order,
+		Notes:        &newNote,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise was not in database")
+	}
+	if dbWOExercise.ExerciseID != newExercise.ID {
+		t.Errorf("expected to updated to %v, got %v", newExercise.ID, dbWOExercise.ExerciseID)
+	}
+	if dbWOExercise.OrderIndex != order {
+		t.Errorf("expected %v, got %v", order, dbWOExercise.OrderIndex)
+	}
+	if dbWOExercise.Notes.String != newNote {
+		t.Errorf("expected %s, got %s", newNote, dbWOExercise.Notes.String)
+	}
+
 }
 func TestHandlerUpdateWorkoutExercise_ResponseBodyMatchesUpdateRecord(t *testing.T) {
-	t.Skip()
+	x := testingWorkoutExerciseHandlerSetup(t)
+	newExercise := createTestExercise(t, x.cfg, x.user.ID)
+	woExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	type requestBody struct {
+		ExerciseName string  `json:"exercise_name"`
+		OrderIndex   int32   `json:"order_index"`
+		Notes        *string `json:"notes,omitempty"`
+	}
+	newString := "updated test note"
+	body := requestBody{
+		ExerciseName: newExercise.ExerciseName,
+		OrderIndex:   2,
+		Notes:        &newString,
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+woExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", woExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), woExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise was not in database")
+	}
+	response := testingDecodeJSONResponse[workoutExercise](t, rr)
+	if response.ID != dbWOExercise.ID {
+		t.Errorf("expected ID %v, to match %v", dbWOExercise.ID, response.ID)
+	}
+	if response.ExerciseID != dbWOExercise.ExerciseID {
+		t.Errorf("expected ExerciseID %v, to match %v", dbWOExercise.ExerciseID, response.ExerciseID)
+	}
+	if response.Notes == nil && dbWOExercise.Notes.Valid {
+		t.Errorf("notes were nil and valid")
+	}
+	if response.Notes != nil && *response.Notes != dbWOExercise.Notes.String {
+		t.Errorf("notes did not match")
+	}
+	if response.OrderIndex != dbWOExercise.OrderIndex {
+		t.Errorf("expected orderIndex %v, to match %v", dbWOExercise.OrderIndex, response.OrderIndex)
+	}
+
 }
 func TestHandlerUpdateWorkoutExercise_ExerciseNameTrimmed(t *testing.T) {
 	x := testingWorkoutExerciseHandlerSetup(t)
@@ -437,17 +714,43 @@ func TestHandlerUpdateWorkoutExercise_ExerciseNameTrimmed(t *testing.T) {
 		t.Fatal("workout exercise was not in database")
 	}
 	if dbWOExercise.ExerciseID == originalExerciseID {
-		t.Fatal("expected exercise to change after trimming the exercise name")
+		t.Errorf("expected exercise to change after trimming the exercise name")
 	}
 	if dbWOExercise.ExerciseID != newExercise.ID {
-		t.Fatalf("expected exercise ID %v, got %v", newExercise.ID, dbWOExercise.ExerciseID)
+		t.Errorf("expected exercise ID %v, got %v", newExercise.ID, dbWOExercise.ExerciseID)
 	}
 }
 func TestHandlerUpdateWorkoutExercise_ExerciseNameInternalWhitespace(t *testing.T) {
-	t.Skip()
+
+	x := testingWorkoutExerciseHandlerSetup(t)
+	newExercise := createTestExerciseForMiddleWhitespaceTest(t, x.cfg, x.user.ID)
+	workoutExercise := createTestWorkoutExercise(t, x.cfg, x.workoutSession, x.exercise.ID)
+	originalExerciseID := workoutExercise.ExerciseID
+	type requestBody struct {
+		ExerciseName string `json:"exercise_name"`
+	}
+	body := requestBody{
+		ExerciseName: "bench     press",
+	}
+	JSONBody := testingMarshalJSON(t, body)
+	req := testingCreateAuthenticatedJSONRequest(http.MethodPut, "/api/v1/workout_exercises/"+workoutExercise.ID.String(), JSONBody, x.token)
+	req.SetPathValue("id", workoutExercise.ID.String())
+	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerUpdateWorkoutExercise), req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("expected status %d got %d: %s", http.StatusNotFound, rr.Code, rr.Body.String())
+	}
+	dbWOExercise, err := x.cfg.db.GetWorkoutExerciseFromID(context.Background(), workoutExercise.ID)
+	if err != nil {
+		t.Fatal("workout exercise was not in database")
+	}
+	if dbWOExercise.ExerciseID != originalExerciseID {
+		t.Errorf("expected exercise to not change")
+	}
+	if dbWOExercise.ExerciseID == newExercise.ID {
+		t.Errorf("expected exercise to not change to new exercise")
+	}
 }
 
-//TODO Fully test update
 /*
  *
  *
