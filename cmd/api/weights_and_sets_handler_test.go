@@ -103,14 +103,14 @@ func TestHandlerGetTotalDuration_Success(t *testing.T) {
 	rr := testingExecuteRequest(http.HandlerFunc(x.cfg.handlerGetTotalDuration), req)
 
 	if rr.Code != http.StatusOK {
-		t.Fatalf("expected status %d got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rr.Code, rr.Body.String())
 	}
 
 	response := testingDecodeJSONResponse[durationResponse](t, rr)
 	expected := set.DurationSeconds.Int32 + set.RestTimeSeconds.Int32
 
 	if response.TotalSeconds != expected {
-		t.Errorf("expected duration %d got %d", expected, response.TotalSeconds)
+		t.Errorf("expected duration %d, got %d", expected, response.TotalSeconds)
 	}
 }
 func TestHandlerGetVolumeSet_Success(t *testing.T) {
