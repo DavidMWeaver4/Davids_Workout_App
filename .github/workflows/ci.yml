@@ -10,6 +10,7 @@ jobs:
   tests:
     name: Tests
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres:17
@@ -27,20 +28,22 @@ jobs:
 
     env:
       TEST_DB_URL: postgres://postgres:postgres@localhost:5432/workout_tracker_test?sslmode=disable
+
     steps:
       - name: Check out code
         uses: actions/checkout@v5
 
-      - name: Set Up Go
+      - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.25.6"
+          cache: true
 
       - name: Get dependencies
         run: go mod download
 
       - name: Install Goose
-        run: go install github.com/pressly/goose/v3/cmd/goose@latest
+        run: go install github.com/pressly/goose/v3/cmd/goose@v3.27.0
 
       - name: Run migrations
         run: goose -dir internal/db/migrations postgres "$TEST_DB_URL" up
@@ -48,8 +51,66 @@ jobs:
       - name: Run unit tests
         run: go test ./... -cover
 
+  race:
+    name: Race Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: workout_tracker_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TEST_DB_URL: postgres://postgres:postgres@localhost:5432/workout_tracker_test?sslmode=disable
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.6"
+          cache: true
+
+      - name: Get dependencies
+        run: go mod download
+
+      - name: Install Goose
+        run: go install github.com/pressly/goose/v3/cmd/goose@v3.27.0
+
+      - name: Run migrations
+        run: goose -dir internal/db/migrations postgres "$TEST_DB_URL" up
+
+      - name: Run race tests
+        run: go test -race ./...
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.6"
+          cache: true
+
       - name: Install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
 
       - name: Run gosec
         run: gosec -exclude-generated ./...
@@ -66,9 +127,13 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.25.6"
+          cache: true
+
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
 
       - name: Install staticcheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+        run: go install honnef.co/go/tools/cmd/staticcheck@2026.1
 
       - name: Run staticcheck
         run: staticcheck ./...

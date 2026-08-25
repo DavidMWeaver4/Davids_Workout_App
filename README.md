@@ -191,7 +191,7 @@ Base URL: `/api/v1`
 ## TODO
 - [x] Initial unit test suite
 - [ ] Increase test coverage (Currently implementing)
-    - /cmd/api:  42.8% coverage
+    - /cmd/api:  52.8% coverage
     - /internal/auth: 56.0% coverage
 - [ ] CD pipeline
 - [ ] Basic frontend 

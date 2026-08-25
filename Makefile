@@ -4,7 +4,7 @@ IMAGE_NAME := davids_workout_app
 CONTAINER_NAME := Davids_Workout_App_Container
 DB_CONTAINER_NAME := davids_workout_db_container
 
-.PHONY: build up up-db down shell clean logs test test-db-reset test-cover
+.PHONY: build up up-db down shell clean logs migrate-up migrate-down sqlc run test-db-reset test test-cover test-race help
 
 build:
 	docker build -t $(IMAGE_NAME) .
@@ -51,6 +51,9 @@ test-cover: test-db-reset
 	go test -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out
 
+test-race: test-db-reset
+	go test -race ./...
+
 help:
 	@echo "Available commands:"
 	@echo "  make build         Build docker image"
@@ -66,3 +69,4 @@ help:
 	@echo "  make sqlc          Regenerate sqlc code"
 	@echo "  make test          Run Go unit tests"
 	@echo "  make test-cover    Run Go tests with coverage"
+	@echo "  make test-race     Run Go tests with race"
